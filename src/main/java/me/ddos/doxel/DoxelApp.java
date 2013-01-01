@@ -21,15 +21,11 @@ public class DoxelApp {
 	private static final Vector2f cameraRotation = new Vector2f();
 
 	/**
-	 * The entry point for the application
+	 * The entry point for the application.
 	 *
 	 * @param args Unused.
 	 */
 	public static void main(String[] args) {
-		new DoxelApp().start();
-	}
-
-	private void start() {
 		Doxel.create("Doxel", 1200, 800, 75);
 		Doxel.generateModelMesh(-10, -10, -10, 30, 30, 30);
 		Doxel.createModel();
@@ -49,8 +45,8 @@ public class DoxelApp {
 		Doxel.destroy();
 	}
 
-	private void processInput() {
-		cameraRotation.x -= Mouse.getDY() * MOUSE_SENSITIVITY;
+	private static void processInput() {
+		cameraRotation.x += Mouse.getDY() * MOUSE_SENSITIVITY;
 		cameraRotation.y -= Mouse.getDX() * MOUSE_SENSITIVITY;
 		final Quaternion yaw = new Quaternion();
 		yaw.setFromAxisAngle(new Vector4f(1, 0, 0, cameraRotation.x));

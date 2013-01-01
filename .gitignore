@@ -64,3 +64,4 @@ nb-configuration.xml
 # Misc files #
 ##############
 *.bak
+*.class
