@@ -303,7 +303,7 @@ public class MarchingCubesPolygonizer implements Polygonizer {
 		{0, 3, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
 		{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}
 	};
-	private static double THRESHOLD = 0;
+	private double threshold = 0;
 
 	@Override
 	public int polygonize(GridCell cell, TFloatList positions, TFloatList normals,
@@ -312,28 +312,28 @@ public class MarchingCubesPolygonizer implements Polygonizer {
 		final Vector3f[] vertices = new Vector3f[12];
 		int cubeIndex = 0;
 
-		if (cell.v0 < THRESHOLD) {
+		if (cell.v0 < threshold) {
 			cubeIndex |= 1;
 		}
-		if (cell.v1 < THRESHOLD) {
+		if (cell.v1 < threshold) {
 			cubeIndex |= 2;
 		}
-		if (cell.v2 < THRESHOLD) {
+		if (cell.v2 < threshold) {
 			cubeIndex |= 4;
 		}
-		if (cell.v3 < THRESHOLD) {
+		if (cell.v3 < threshold) {
 			cubeIndex |= 8;
 		}
-		if (cell.v4 < THRESHOLD) {
+		if (cell.v4 < threshold) {
 			cubeIndex |= 16;
 		}
-		if (cell.v5 < THRESHOLD) {
+		if (cell.v5 < threshold) {
 			cubeIndex |= 32;
 		}
-		if (cell.v6 < THRESHOLD) {
+		if (cell.v6 < threshold) {
 			cubeIndex |= 64;
 		}
-		if (cell.v7 < THRESHOLD) {
+		if (cell.v7 < threshold) {
 			cubeIndex |= 128;
 		}
 
@@ -414,17 +414,37 @@ public class MarchingCubesPolygonizer implements Polygonizer {
 		return index;
 	}
 
-	private static Vector3f lerp(Vector3f p1, Vector3f p2, double valp1, double valp2) {
-		if (Math.abs(THRESHOLD - valp1) < 0.00001) {
+	/**
+	 * Gets the threshold which is the minimum value before a value is considered as being outside
+	 * the mesh.
+	 *
+	 * @return The threshold value.
+	 */
+	public double threshold() {
+		return threshold;
+	}
+
+	/**
+	 * Sets the threshold which is the minimum value before a value is considered as being outside
+	 * the mesh.
+	 *
+	 * @param threshold The threshold value.
+	 */
+	public void threshold(double threshold) {
+		this.threshold = threshold;
+	}
+
+	private Vector3f lerp(Vector3f p1, Vector3f p2, double valp1, double valp2) {
+		if (Math.abs(threshold - valp1) < 0.00001) {
 			return p1;
 		}
-		if (Math.abs(THRESHOLD - valp2) < 0.00001) {
+		if (Math.abs(threshold - valp2) < 0.00001) {
 			return p2;
 		}
 		if (Math.abs(valp1 - valp2) < 0.00001) {
 			return p1;
 		}
-		float mu = (float) ((THRESHOLD - valp1) / (valp2 - valp1));
+		float mu = (float) ((threshold - valp1) / (valp2 - valp1));
 		return new Vector3f(p1.x + mu * (p2.x - p1.x), p1.y + mu * (p2.y - p1.y), p1.z + mu * (p2.z - p1.z));
 	}
 }
