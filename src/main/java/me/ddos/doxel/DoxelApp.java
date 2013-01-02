@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.SystemUtils;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
@@ -39,6 +40,7 @@ public class DoxelApp {
 	 */
 	public static void main(String[] args) throws Exception {
 		try {
+			deploy();
 			loadConfiguration();
 			Doxel.generateModelMesh(modelPosition.x, modelPosition.y, modelPosition.z,
 					modelSize.x, modelSize.y, modelSize.z);
@@ -47,10 +49,9 @@ public class DoxelApp {
 			Mouse.setGrabbed(true);
 			while (!Display.isCloseRequested()) {
 				processInput();
-				Doxel.logic();
+				Doxel.doLogic();
 				Doxel.render();
 				Thread.sleep(50);
-
 			}
 			Mouse.setGrabbed(false);
 			Doxel.destroy();
@@ -60,13 +61,51 @@ public class DoxelApp {
 		}
 	}
 
-	private static void loadConfiguration() throws Exception {
+	private static void deploy() throws Exception {
 		final File configFile = new File("config.yml");
 		if (!configFile.exists()) {
 			FileUtils.copyURLToFile(DoxelApp.class.getResource("/config.yml"), configFile);
+
 		}
+		final String osPath;
+		final String[] nativeLibs;
+		if (SystemUtils.IS_OS_WINDOWS) {
+			nativeLibs = new String[]{
+				"jinput-dx8_64.dll", "jinput-dx8.dll", "jinput-raw_64.dll", "jinput-raw.dll",
+				"jinput-wintab.dll", "lwjgl.dll", "lwjgl64.dll", "OpenAL32.dll", "OpenAL64.dll"
+			};
+			osPath = "windows/";
+		} else if (SystemUtils.IS_OS_MAC) {
+			nativeLibs = new String[]{
+				"libjinput-osx.jnilib", "liblwjgl.jnilib", "openal.dylib"
+			};
+			osPath = "mac/";
+		} else if (SystemUtils.IS_OS_LINUX) {
+			nativeLibs = new String[]{
+				"liblwjgl.so", "liblwjgl64.so", "libopenal.so", "libopenal64.so", "libjinput-linux.so",
+				"libjinput-linux64.so"
+			};
+			osPath = "linux/";
+		} else {
+			throw new IllegalStateException("Could not get lwjgl natives for OS \"" + SystemUtils.OS_NAME + "\"");
+		}
+		final File nativesDir = new File("natives" + File.separator + osPath);
+		nativesDir.mkdirs();
+		for (String nativeLib : nativeLibs) {
+			final File nativeFile = new File(nativesDir, nativeLib);
+			if (!nativeFile.exists()) {
+				FileUtils.copyInputStreamToFile(DoxelApp.class.getResourceAsStream("/" + nativeLib), nativeFile);
+			}
+		}
+		final String nativePath = nativesDir.getAbsolutePath();
+		System.setProperty("org.lwjgl.librarypath", nativePath);
+		System.setProperty("net.java.games.input.librarypath", nativePath);
+	}
+
+	@SuppressWarnings("unchecked")
+	private static void loadConfiguration() throws Exception {
 		final Yaml yaml = new Yaml();
-		final Map<String, Object> config = (Map<String, Object>) yaml.load(new FileInputStream(configFile));
+		final Map<String, Object> config = (Map<String, Object>) yaml.load(new FileInputStream("config.yml"));
 		final Map<String, Object> input = (Map<String, Object>) config.get("Input");
 		final Map<String, Object> appearance = (Map<String, Object>) config.get("Appearance");
 		final Map<String, Object> model = (Map<String, Object>) config.get("Model");

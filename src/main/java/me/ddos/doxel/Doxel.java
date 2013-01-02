@@ -6,8 +6,9 @@ import gnu.trove.list.array.TFloatArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import java.awt.Color;
 import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import org.lwjgl.BufferUtils;
@@ -162,8 +163,8 @@ public class Doxel {
 	}
 
 	private static void createShaders() {
-		vertexShaderID = loadShader("src/main/resources/doxel.vert", GL20.GL_VERTEX_SHADER);
-		fragementShaderID = loadShader("src/main/resources/doxel.frag", GL20.GL_FRAGMENT_SHADER);
+		vertexShaderID = loadShader(Doxel.class.getResourceAsStream("/doxel.vert"), GL20.GL_VERTEX_SHADER);
+		fragementShaderID = loadShader(Doxel.class.getResourceAsStream("/doxel.frag"), GL20.GL_FRAGMENT_SHADER);
 		programID = GL20.glCreateProgram();
 		GL20.glAttachShader(programID, vertexShaderID);
 		GL20.glAttachShader(programID, fragementShaderID);
@@ -567,12 +568,12 @@ public class Doxel {
 	}
 
 	/**
-	 * The logic part of the rendering cycle. Generates the matrices for model to camera
+	 * The doLogic part of the rendering cycle. Generates the matrices for model to camera
 	 * transformation.
 	 *
 	 * @throws IllegalStateException If the display wasn't created first.
 	 */
-	public static void logic() {
+	public static void doLogic() {
 		if (!isDisplayCreated) {
 			throw new IllegalStateException("Display needs to be created first.");
 		}
@@ -624,7 +625,7 @@ public class Doxel {
 	 * Displays the current model with the proper rotation and position to the render window.
 	 *
 	 * @throws IllegalStateException If the display wasn't created first. If the model wasn't
-	 * created first. If the logic wasn't created ran at least once before.
+	 * created first. If the doLogic wasn't created ran at least once before.
 	 */
 	public static void render() {
 		if (!isDisplayCreated) {
@@ -666,11 +667,11 @@ public class Doxel {
 		}
 	}
 
-	private static int loadShader(String fileName, int type) {
+	private static int loadShader(InputStream shaderRessource, int type) {
 		StringBuilder shaderSource = new StringBuilder();
 		int shaderID;
 		try {
-			BufferedReader reader = new BufferedReader(new FileReader(fileName));
+			BufferedReader reader = new BufferedReader(new InputStreamReader(shaderRessource));
 			String line;
 			while ((line = reader.readLine()) != null) {
 				shaderSource.append(line).append("\n");
@@ -683,7 +684,7 @@ public class Doxel {
 		GL20.glShaderSource(shaderID, shaderSource);
 		GL20.glCompileShader(shaderID);
 		if (GL20.glGetShader(shaderID, GL20.GL_COMPILE_STATUS) == GL11.GL_FALSE) {
-			System.err.println("Could not compile shader '" + fileName + "'");
+			System.err.println("Could not compile shader '" + shaderRessource + "'");
 			System.err.println(GL20.glGetShaderInfoLog(shaderID, 1000));
 			System.exit(-1);
 		}
