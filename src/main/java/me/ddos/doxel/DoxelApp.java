@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SystemUtils;
+import org.lwjgl.Sys;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
@@ -38,7 +39,7 @@ public class DoxelApp {
 	 *
 	 * @param args Unused.
 	 */
-	public static void main(String[] args) throws Exception {
+	public static void main(String[] args) {
 		try {
 			deploy();
 			loadConfiguration();
@@ -57,6 +58,9 @@ public class DoxelApp {
 			Doxel.destroy();
 		} catch (Exception ex) {
 			ex.printStackTrace();
+			final String name = ex.getClass().getSimpleName();
+			final String message = ex.getMessage();
+			Sys.alert("Error: " + name, message == null || message.trim().equals("") ? name : message);
 			System.exit(-1);
 		}
 	}
@@ -64,7 +68,7 @@ public class DoxelApp {
 	private static void deploy() throws Exception {
 		final File configFile = new File("config.yml");
 		if (!configFile.exists()) {
-			FileUtils.copyURLToFile(DoxelApp.class.getResource("/config.yml"), configFile);
+			FileUtils.copyInputStreamToFile(DoxelApp.class.getResourceAsStream("/config.yml"), configFile);
 
 		}
 		final String osPath;

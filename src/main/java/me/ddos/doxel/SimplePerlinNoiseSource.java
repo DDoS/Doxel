@@ -4,7 +4,7 @@ import java.util.Random;
 import net.royawesome.jlibnoise.module.source.Perlin;
 
 /**
- * A simple perlin noise source.
+ * A simple perlin noise source. For testing purposes.
  *
  * @author DDoS
  */

@@ -5,7 +5,7 @@ import org.lwjgl.util.vector.Vector3f;
 /**
  * Represents a cell within a grid of values.
  *
- * This is numbering of the corners.
+ * This is the numbering of the corners.
  *
  * <pre>
  * /\

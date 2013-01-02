@@ -21,6 +21,7 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL32;
+import org.lwjgl.opengl.OpenGLException;
 import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.util.glu.GLU;
 import org.lwjgl.util.vector.Matrix4f;
@@ -97,7 +98,8 @@ public class Doxel {
 	 * @param windowHeight The height of the render window.
 	 * @param fieldOfView The field of view in degrees. 75 is suggested.
 	 */
-	public static void create(String title, int windowWidth, int windowHeight, float fieldOfView) {
+	public static void create(String title, int windowWidth, int windowHeight, float fieldOfView)
+			throws LWJGLException {
 		createDisplay(title, windowWidth, windowHeight);
 		createProjection(fieldOfView);
 		createShaders();
@@ -112,21 +114,17 @@ public class Doxel {
 		destroyDisplay();
 	}
 
-	private static void createDisplay(String title, int width, int height) {
+	private static void createDisplay(String title, int width, int height) throws LWJGLException {
 		if (isDisplayCreated) {
 			throw new IllegalStateException("Display has already been created.");
 		}
 		windowWidth = width;
 		windowHeight = height;
-		try {
-			final PixelFormat pixelFormat = new PixelFormat();
-			final ContextAttribs contextAtrributes = new ContextAttribs(3, 2).withProfileCore(true);
-			Display.setDisplayMode(new DisplayMode(width, height));
-			Display.setTitle(title);
-			Display.create(pixelFormat, contextAtrributes);
-		} catch (LWJGLException e) {
-			System.out.println("LWJGL exception: " + e.getMessage());
-		}
+		final PixelFormat pixelFormat = new PixelFormat();
+		final ContextAttribs contextAtrributes = new ContextAttribs(3, 2).withProfileCore(true);
+		Display.setDisplayMode(new DisplayMode(width, height));
+		Display.setTitle(title);
+		Display.create(pixelFormat, contextAtrributes);
 		GL11.glViewport(0, 0, width, height);
 		GL11.glClearColor(backgroundColor.getRed() / 255f, backgroundColor.getGreen() / 255f,
 				backgroundColor.getBlue() / 255f, backgroundColor.getAlpha() / 255f);
@@ -134,7 +132,7 @@ public class Doxel {
 		GL11.glEnable(GL32.GL_DEPTH_CLAMP);
 		GL11.glDepthMask(true);
 		isDisplayCreated = true;
-		exitOnGLError("createDisplay");
+		checkForOpenGLError("createDisplay");
 	}
 
 	private static void destroyDisplay() {
@@ -144,6 +142,7 @@ public class Doxel {
 		GL11.glDisable(GL11.GL_DEPTH_TEST);
 		GL11.glDepthMask(false);
 		GL11.glDisable(GL11.GL_CULL_FACE);
+		checkForOpenGLError("destroyDisplay");
 		Display.destroy();
 		isDisplayCreated = false;
 	}
@@ -163,8 +162,10 @@ public class Doxel {
 	}
 
 	private static void createShaders() {
-		vertexShaderID = loadShader(Doxel.class.getResourceAsStream("/doxel.vert"), GL20.GL_VERTEX_SHADER);
-		fragementShaderID = loadShader(Doxel.class.getResourceAsStream("/doxel.frag"), GL20.GL_FRAGMENT_SHADER);
+		vertexShaderID = loadShader("Doxel Vertex", Doxel.class.getResourceAsStream("/doxel.vert"),
+				GL20.GL_VERTEX_SHADER);
+		fragementShaderID = loadShader("Doxel Fragment", Doxel.class.getResourceAsStream("/doxel.frag"),
+				GL20.GL_FRAGMENT_SHADER);
 		programID = GL20.glCreateProgram();
 		GL20.glAttachShader(programID, vertexShaderID);
 		GL20.glAttachShader(programID, fragementShaderID);
@@ -178,7 +179,7 @@ public class Doxel {
 		modelSpaceLightPositionLocation = GL20.glGetUniformLocation(programID, "modelSpaceLightPos");
 		lightAttenuationLocation = GL20.glGetUniformLocation(programID, "lightAttenuation");
 		GL20.glValidateProgram(programID);
-		exitOnGLError("createShaders");
+		checkForOpenGLError("createShaders");
 	}
 
 	private static void destroyShaders() {
@@ -188,7 +189,7 @@ public class Doxel {
 		GL20.glDeleteShader(vertexShaderID);
 		GL20.glDeleteShader(fragementShaderID);
 		GL20.glDeleteProgram(programID);
-		exitOnGLError("destroyShaders");
+		checkForOpenGLError("destroyShaders");
 	}
 
 	/**
@@ -275,7 +276,7 @@ public class Doxel {
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
 		GL30.glBindVertexArray(0);
 		isModelCreated = true;
-		exitOnGLError("createModel");
+		checkForOpenGLError("createModel");
 	}
 
 	/**
@@ -312,7 +313,7 @@ public class Doxel {
 		GL20.glVertexAttribPointer(1, NORMAL_COMPONENT_COUNT, GL11.GL_FLOAT, false, 0, 0);
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
 		GL30.glBindVertexArray(0);
-		exitOnGLError("updateModel");
+		checkForOpenGLError("updateModel");
 	}
 
 	private static void destroyModel() {
@@ -331,7 +332,95 @@ public class Doxel {
 		GL30.glDeleteVertexArrays(vertexArrayID);
 		renderingIndicesCount = 0;
 		isModelCreated = false;
-		exitOnGLError("destroyModel");
+		checkForOpenGLError("destroyModel");
+	}
+
+	/**
+	 * The doLogic part of the rendering cycle. Generates the matrices for model to camera
+	 * transformation.
+	 *
+	 * @throws IllegalStateException If the display wasn't created first.
+	 */
+	public static void doLogic() {
+		if (!isDisplayCreated) {
+			throw new IllegalStateException("Display needs to be created first.");
+		}
+		modelRotationMatrix.setIdentity();
+		modelRotationMatrix.m00 = 1 - 2 * modelRotation.y * modelRotation.y - 2 * modelRotation.z * modelRotation.z;
+		modelRotationMatrix.m01 = 2 * modelRotation.x * modelRotation.y - 2 * modelRotation.w * modelRotation.z;
+		modelRotationMatrix.m02 = 2 * modelRotation.x * modelRotation.z + 2 * modelRotation.w * modelRotation.y;
+		modelRotationMatrix.m03 = 0;
+		modelRotationMatrix.m10 = 2 * modelRotation.x * modelRotation.y + 2 * modelRotation.w * modelRotation.z;
+		modelRotationMatrix.m11 = 1 - 2 * modelRotation.x * modelRotation.x - 2 * modelRotation.z * modelRotation.z;
+		modelRotationMatrix.m12 = 2 * modelRotation.y * modelRotation.z - 2 * modelRotation.w * modelRotation.x;
+		modelRotationMatrix.m13 = 0;
+		modelRotationMatrix.m20 = 2 * modelRotation.x * modelRotation.z - 2 * modelRotation.w * modelRotation.y;
+		modelRotationMatrix.m21 = 2 * modelRotation.y * modelRotation.z + 2.f * modelRotation.x * modelRotation.w;
+		modelRotationMatrix.m22 = 1 - 2 * modelRotation.x * modelRotation.x - 2 * modelRotation.y * modelRotation.y;
+		modelRotationMatrix.m23 = 0;
+		modelPositionMatrix.setIdentity();
+		Matrix4f.translate(modelPosition, modelPositionMatrix, modelPositionMatrix);
+		Matrix4f.mul(modelRotationMatrix, modelPositionMatrix, modelToCameraMatrix);
+		logicRanOnce = true;
+	}
+
+	private static void preRender() {
+		final FloatBuffer matrix44Buffer = BufferUtils.createFloatBuffer(16);
+		modelToCameraMatrix.store(matrix44Buffer);
+		matrix44Buffer.flip();
+		GL20.glUniformMatrix4(modelToCameraMatrixLocation, false, matrix44Buffer);
+		matrix44Buffer.clear();
+		cameraToClipMatrix.store(matrix44Buffer);
+		matrix44Buffer.flip();
+		GL20.glUniformMatrix4(cameraToClipMatrixLocation, false, matrix44Buffer);
+		final FloatBuffer matrix33Buffer = BufferUtils.createFloatBuffer(9);
+		modelToCameraMatrix.store3f(matrix33Buffer);
+		matrix33Buffer.flip();
+		GL20.glUniformMatrix3(normalModelToCameraMatrixLocation, false, matrix33Buffer);
+		GL20.glUniform4f(diffuseColorLocation, modelColor().getRed() / 255f, modelColor().getGreen() / 255f,
+				modelColor().getBlue() / 255f, modelColor().getAlpha() / 255f);
+		GL20.glUniform4f(lightIntensityLocation, lightIntensity.getRed() / 255f, lightIntensity.getGreen() / 255f,
+				lightIntensity.getBlue() / 255f, lightIntensity.getAlpha() / 255f);
+		GL20.glUniform4f(ambientIntensityLocation, ambientIntensity.getRed() / 255f, ambientIntensity.getGreen() / 255f,
+				ambientIntensity.getBlue() / 255f, ambientIntensity.getAlpha() / 255f);
+		GL20.glUniform3f(modelSpaceLightPositionLocation, lightPosition.x, lightPosition.y,
+				lightPosition.z);
+		GL20.glUniform1f(lightAttenuationLocation, lightAttenuation);
+		checkForOpenGLError("preRender");
+	}
+
+	/**
+	 * Displays the current model with the proper rotation and position to the render window.
+	 *
+	 * @throws IllegalStateException If the display wasn't created first. If the model wasn't
+	 * created first. If the doLogic wasn't created ran at least once before.
+	 */
+	public static void render() {
+		if (!isDisplayCreated) {
+			throw new IllegalStateException("Display needs to be created first.");
+		}
+		if (!isModelCreated) {
+			throw new IllegalStateException("Model needs to be created first.");
+		}
+		if (!logicRanOnce) {
+			throw new IllegalStateException("Logic needs to be run first at least once.");
+		}
+		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
+		GL20.glUseProgram(programID);
+		preRender();
+		GL30.glBindVertexArray(vertexArrayID);
+		GL20.glEnableVertexAttribArray(0);
+		GL20.glEnableVertexAttribArray(1);
+		GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, vertexIndexBufferID);
+		GL11.glDrawElements(GL11.GL_TRIANGLES, renderingIndicesCount, GL11.GL_UNSIGNED_INT, 0);
+		GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
+		GL20.glDisableVertexAttribArray(0);
+		GL20.glDisableVertexAttribArray(1);
+		GL30.glBindVertexArray(0);
+		GL20.glUseProgram(0);
+		Display.sync(60);
+		Display.update();
+		checkForOpenGLError("render");
 	}
 
 	/**
@@ -567,128 +656,35 @@ public class Doxel {
 		Doxel.polygonizer = polygonizer;
 	}
 
-	/**
-	 * The doLogic part of the rendering cycle. Generates the matrices for model to camera
-	 * transformation.
-	 *
-	 * @throws IllegalStateException If the display wasn't created first.
-	 */
-	public static void doLogic() {
-		if (!isDisplayCreated) {
-			throw new IllegalStateException("Display needs to be created first.");
-		}
-		modelRotationMatrix.setIdentity();
-		modelRotationMatrix.m00 = 1 - 2 * modelRotation.y * modelRotation.y - 2 * modelRotation.z * modelRotation.z;
-		modelRotationMatrix.m01 = 2 * modelRotation.x * modelRotation.y - 2 * modelRotation.w * modelRotation.z;
-		modelRotationMatrix.m02 = 2 * modelRotation.x * modelRotation.z + 2 * modelRotation.w * modelRotation.y;
-		modelRotationMatrix.m03 = 0;
-		modelRotationMatrix.m10 = 2 * modelRotation.x * modelRotation.y + 2 * modelRotation.w * modelRotation.z;
-		modelRotationMatrix.m11 = 1 - 2 * modelRotation.x * modelRotation.x - 2 * modelRotation.z * modelRotation.z;
-		modelRotationMatrix.m12 = 2 * modelRotation.y * modelRotation.z - 2 * modelRotation.w * modelRotation.x;
-		modelRotationMatrix.m13 = 0;
-		modelRotationMatrix.m20 = 2 * modelRotation.x * modelRotation.z - 2 * modelRotation.w * modelRotation.y;
-		modelRotationMatrix.m21 = 2 * modelRotation.y * modelRotation.z + 2.f * modelRotation.x * modelRotation.w;
-		modelRotationMatrix.m22 = 1 - 2 * modelRotation.x * modelRotation.x - 2 * modelRotation.y * modelRotation.y;
-		modelRotationMatrix.m23 = 0;
-		modelPositionMatrix.setIdentity();
-		Matrix4f.translate(modelPosition, modelPositionMatrix, modelPositionMatrix);
-		Matrix4f.mul(modelRotationMatrix, modelPositionMatrix, modelToCameraMatrix);
-		logicRanOnce = true;
-		exitOnGLError("logic");
-	}
-
-	private static void preRender() {
-		final FloatBuffer matrix44Buffer = BufferUtils.createFloatBuffer(16);
-		modelToCameraMatrix.store(matrix44Buffer);
-		matrix44Buffer.flip();
-		GL20.glUniformMatrix4(modelToCameraMatrixLocation, false, matrix44Buffer);
-		matrix44Buffer.clear();
-		cameraToClipMatrix.store(matrix44Buffer);
-		matrix44Buffer.flip();
-		GL20.glUniformMatrix4(cameraToClipMatrixLocation, false, matrix44Buffer);
-		final FloatBuffer matrix33Buffer = BufferUtils.createFloatBuffer(9);
-		modelToCameraMatrix.store3f(matrix33Buffer);
-		matrix33Buffer.flip();
-		GL20.glUniformMatrix3(normalModelToCameraMatrixLocation, false, matrix33Buffer);
-		GL20.glUniform4f(diffuseColorLocation, modelColor().getRed() / 255f, modelColor().getGreen() / 255f,
-				modelColor().getBlue() / 255f, modelColor().getAlpha() / 255f);
-		GL20.glUniform4f(lightIntensityLocation, lightIntensity.getRed() / 255f, lightIntensity.getGreen() / 255f,
-				lightIntensity.getBlue() / 255f, lightIntensity.getAlpha() / 255f);
-		GL20.glUniform4f(ambientIntensityLocation, ambientIntensity.getRed() / 255f, ambientIntensity.getGreen() / 255f,
-				ambientIntensity.getBlue() / 255f, ambientIntensity.getAlpha() / 255f);
-		GL20.glUniform3f(modelSpaceLightPositionLocation, lightPosition.x, lightPosition.y,
-				lightPosition.z);
-		GL20.glUniform1f(lightAttenuationLocation, lightAttenuation);
-	}
-
-	/**
-	 * Displays the current model with the proper rotation and position to the render window.
-	 *
-	 * @throws IllegalStateException If the display wasn't created first. If the model wasn't
-	 * created first. If the doLogic wasn't created ran at least once before.
-	 */
-	public static void render() {
-		if (!isDisplayCreated) {
-			throw new IllegalStateException("Display needs to be created first.");
-		}
-		if (!isModelCreated) {
-			throw new IllegalStateException("Model needs to be created first.");
-		}
-		if (!logicRanOnce) {
-			throw new IllegalStateException("Logic needs to be run first at least once.");
-		}
-		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
-		GL20.glUseProgram(programID);
-		preRender();
-		GL30.glBindVertexArray(vertexArrayID);
-		GL20.glEnableVertexAttribArray(0);
-		GL20.glEnableVertexAttribArray(1);
-		GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, vertexIndexBufferID);
-		GL11.glDrawElements(GL11.GL_TRIANGLES, renderingIndicesCount, GL11.GL_UNSIGNED_INT, 0);
-		GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
-		GL20.glDisableVertexAttribArray(0);
-		GL20.glDisableVertexAttribArray(1);
-		GL30.glBindVertexArray(0);
-		GL20.glUseProgram(0);
-		Display.sync(60);
-		Display.update();
-		exitOnGLError("render");
-	}
-
-	private static void exitOnGLError(String errorMessage) {
-		int errorValue = GL11.glGetError();
+	private static void checkForOpenGLError(String step) {
+		final int errorValue = GL11.glGetError();
 		if (errorValue != GL11.GL_NO_ERROR) {
-			String errorString = GLU.gluErrorString(errorValue);
-			System.err.println("ERROR: " + errorMessage + ": " + errorString);
-			if (Display.isCreated()) {
-				Display.destroy();
-			}
-			System.exit(-1);
+			throw new OpenGLException("OPEN GL ERROR: " + step + ": " + GLU.gluErrorString(errorValue));
 		}
 	}
 
-	private static int loadShader(InputStream shaderRessource, int type) {
-		StringBuilder shaderSource = new StringBuilder();
-		int shaderID;
+	private static int loadShader(String name, InputStream shaderRessource, int type) {
+		final StringBuilder shaderSource = new StringBuilder();
 		try {
-			BufferedReader reader = new BufferedReader(new InputStreamReader(shaderRessource));
+			final BufferedReader reader = new BufferedReader(new InputStreamReader(shaderRessource));
 			String line;
 			while ((line = reader.readLine()) != null) {
 				shaderSource.append(line).append("\n");
 			}
 			reader.close();
+			shaderRessource.close();
 		} catch (IOException e) {
 			System.out.println("IO exception: " + e.getMessage());
 		}
-		shaderID = GL20.glCreateShader(type);
+		final int shaderID = GL20.glCreateShader(type);
 		GL20.glShaderSource(shaderID, shaderSource);
 		GL20.glCompileShader(shaderID);
 		if (GL20.glGetShader(shaderID, GL20.GL_COMPILE_STATUS) == GL11.GL_FALSE) {
-			System.err.println("Could not compile shader '" + shaderRessource + "'");
-			System.err.println(GL20.glGetShaderInfoLog(shaderID, 1000));
-			System.exit(-1);
+			throw new OpenGLException("OPEN GL ERROR: Could not compile shader \"" + name + "\"\n"
+					+ GL20.glGetShaderInfoLog(shaderID, 1000));
+
 		}
-		exitOnGLError("loadShader");
+		checkForOpenGLError("loadShader");
 		return shaderID;
 	}
 
