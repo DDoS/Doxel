@@ -14,5 +14,5 @@ Model:
     ModelPosition: -15, -15, -15
     ModelSize: 30, 30, 30
     MeshResolution: 0.5
-NoiseSource:
-    Path: default_noise_source.jar
+Plugin:
+    Path: plugin.jar

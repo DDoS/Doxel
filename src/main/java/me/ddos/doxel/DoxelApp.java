@@ -3,6 +3,9 @@ package me.ddos.doxel;
 import java.awt.Color;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.InputStream;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SystemUtils;
@@ -33,6 +36,9 @@ public class DoxelApp {
 	private static final Vector3f modelSize = new Vector3f();
 	// Input
 	private static final Vector2f cameraRotation = new Vector2f();
+	// Plugin
+	private static String pluginPath;
+	private static DoxelPlugin plugin;
 
 	/**
 	 * The entry point for the application.
@@ -43,6 +49,10 @@ public class DoxelApp {
 		try {
 			deploy();
 			loadConfiguration();
+			loadPlugin();
+			if (plugin != null) {
+				plugin.load();
+			}
 			Doxel.generateModelMesh(modelPosition.x, modelPosition.y, modelPosition.z,
 					modelSize.x, modelSize.y, modelSize.z);
 			Doxel.create(windowTitle, windowWidth, windowHeight, fieldOfView);
@@ -53,6 +63,9 @@ public class DoxelApp {
 				Doxel.doLogic();
 				Doxel.render();
 				Thread.sleep(50);
+			}
+			if (plugin != null) {
+				plugin.unload();
 			}
 			Mouse.setGrabbed(false);
 			Doxel.destroy();
@@ -69,7 +82,6 @@ public class DoxelApp {
 		final File configFile = new File("config.yml");
 		if (!configFile.exists()) {
 			FileUtils.copyInputStreamToFile(DoxelApp.class.getResourceAsStream("/config.yml"), configFile);
-
 		}
 		final String osPath;
 		final String[] nativeLibs;
@@ -108,26 +120,56 @@ public class DoxelApp {
 
 	@SuppressWarnings("unchecked")
 	private static void loadConfiguration() throws Exception {
-		final Yaml yaml = new Yaml();
-		final Map<String, Object> config = (Map<String, Object>) yaml.load(new FileInputStream("config.yml"));
-		final Map<String, Object> input = (Map<String, Object>) config.get("Input");
-		final Map<String, Object> appearance = (Map<String, Object>) config.get("Appearance");
-		final Map<String, Object> model = (Map<String, Object>) config.get("Model");
-		mouseSensitivity = ((Number) input.get("MouseSensitivity")).floatValue();
-		cameraSpeed = ((Number) input.get("CameraSpeed")).floatValue();
-		windowTitle = (String) appearance.get("WindowTitle");
-		final String[] windowSize = ((String) appearance.get("WindowSize")).split(",");
-		windowWidth = Integer.parseInt(windowSize[0].trim());
-		windowHeight = Integer.parseInt(windowSize[1].trim());
-		fieldOfView = ((Number) appearance.get("FieldOfView")).floatValue();
-		Doxel.backgroundColor(parseColor(((String) appearance.get("BackgroundColor")), 0));
-		Doxel.modelColor(parseColor(((String) appearance.get("ModelColor")), 1));
-		Doxel.lightColor(parseColor(((String) appearance.get("LightIntensity")), 1));
-		Doxel.ambientLightColor(parseColor(((String) appearance.get("AmbientIntensity")), 1));
-		Doxel.lightAttenuation(((Number) appearance.get("LightAttenuation")).floatValue());
-		parseVector(((String) model.get("ModelPosition")), modelPosition);
-		parseVector(((String) model.get("ModelSize")), modelSize);
-		Doxel.meshResolution(((Number) model.get("MeshResolution")).floatValue());
+		try {
+			final Map<String, Object> config =
+					(Map<String, Object>) new Yaml().load(new FileInputStream("config.yml"));
+			final Map<String, Object> input = (Map<String, Object>) config.get("Input");
+			final Map<String, Object> appearance = (Map<String, Object>) config.get("Appearance");
+			final Map<String, Object> model = (Map<String, Object>) config.get("Model");
+			final Map<String, Object> noiseSource = (Map<String, Object>) config.get("Plugin");
+			mouseSensitivity = ((Number) input.get("MouseSensitivity")).floatValue();
+			cameraSpeed = ((Number) input.get("CameraSpeed")).floatValue();
+			windowTitle = appearance.get("WindowTitle").toString();
+			final String[] windowSize = ((String) appearance.get("WindowSize")).split(",");
+			windowWidth = Integer.parseInt(windowSize[0].trim());
+			windowHeight = Integer.parseInt(windowSize[1].trim());
+			fieldOfView = ((Number) appearance.get("FieldOfView")).floatValue();
+			Doxel.backgroundColor(parseColor(((String) appearance.get("BackgroundColor")), 0));
+			Doxel.modelColor(parseColor(((String) appearance.get("ModelColor")), 1));
+			Doxel.lightColor(parseColor(((String) appearance.get("LightIntensity")), 1));
+			Doxel.ambientLightColor(parseColor(((String) appearance.get("AmbientIntensity")), 1));
+			Doxel.lightAttenuation(((Number) appearance.get("LightAttenuation")).floatValue());
+			parseVector(((String) model.get("ModelPosition")), modelPosition);
+			parseVector(((String) model.get("ModelSize")), modelSize);
+			Doxel.meshResolution(((Number) model.get("MeshResolution")).floatValue());
+			pluginPath = noiseSource.get("Path").toString();
+		} catch (Exception ex) {
+			throw new IllegalStateException("Malformed config.yml: \"" + ex.getMessage() + "\"");
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private static void loadPlugin() throws Exception {
+		final File pluginFile = new File(pluginPath);
+		if (!pluginFile.exists()) {
+			return;
+		}
+		final URLClassLoader classLoader = new URLClassLoader(new URL[]{pluginFile.toURI().toURL()});
+		final InputStream infoStream = classLoader.getResourceAsStream("plugin.yml");
+		if (infoStream == null) {
+			throw new IllegalStateException("Plugin \"" + pluginPath + "\" is missing its plugin.yml");
+		}
+		final Map info = (Map) new Yaml().load(infoStream);
+		if (!info.containsKey("MainClass")) {
+			throw new IllegalStateException("Plugin \"" + pluginPath + "\" has an invalid plugin.yml");
+		}
+		final String mainClassName = info.get("MainClass").toString();
+		final Object mainClass = classLoader.loadClass(mainClassName).newInstance();
+		if (!(mainClass instanceof DoxelPlugin)) {
+			throw new IllegalStateException("Main class \'" + mainClassName + "\" from plugin \""
+					+ pluginPath + "\" does not implement \"DoxelPlugin\"");
+		}
+		plugin = (DoxelPlugin) mainClass;
 	}
 
 	private static void processInput() {
