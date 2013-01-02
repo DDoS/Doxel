@@ -82,6 +82,7 @@ public class Doxel {
 	private static Color lightIntensity = new Color(0.9f, 0.9f, 0.9f, 1);
 	private static Color ambientIntensity = new Color(0.1f, 0.1f, 0.1f, 1);
 	private static Color diffuseColor = new Color(1, 0.1f, 0.1f, 1);
+	private static Color backgroundColor = new Color(0.2f, 0.2f, 0.2f, 0);
 	private static float lightAttenuation = 0.12f;
 
 	private Doxel() {
@@ -126,7 +127,8 @@ public class Doxel {
 			System.out.println("LWJGL exception: " + e.getMessage());
 		}
 		GL11.glViewport(0, 0, width, height);
-		backgroundColor(new Color(0.2f, 0.2f, 0.2f, 0));
+		GL11.glClearColor(backgroundColor.getRed() / 255f, backgroundColor.getGreen() / 255f,
+				backgroundColor.getBlue() / 255f, backgroundColor.getAlpha() / 255f);
 		GL11.glEnable(GL11.GL_DEPTH_TEST);
 		GL11.glEnable(GL32.GL_DEPTH_CLAMP);
 		GL11.glDepthMask(true);
@@ -240,8 +242,8 @@ public class Doxel {
 	/**
 	 * Creates the model from it's mesh. Must be called after mesh is generated using {@link #generateModelMesh}.
 	 *
-	 * @throws IllegalStateException If the display wasn't created first. If the mesh wasn't created
-	 * first. If the model has already been created.
+	 * @throws IllegalStateException If the display wasn't created first. If the model has already
+	 * been created.
 	 */
 	public static void createModel() {
 		if (!isDisplayCreated) {
@@ -249,9 +251,6 @@ public class Doxel {
 		}
 		if (isModelCreated) {
 			throw new IllegalStateException("Model has already been created.");
-		}
-		if (positions.isEmpty()) {
-			throw new IllegalStateException("Mesh data needs to be generated first.");
 		}
 		vertexIndexBufferID = GL15.glGenBuffers();
 		GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, vertexIndexBufferID);
@@ -282,15 +281,11 @@ public class Doxel {
 	 * Updates the model. Deletes old model resources and creates new ones from the mesh. Does not
 	 * delete the model mesh.
 	 *
-	 * @throws IllegalStateException If the display wasn't created first. If the mesh wasn't created
-	 * first.
+	 * @throws IllegalStateException If the display wasn't created first.
 	 */
 	public static void updateModel() {
 		if (!isModelCreated) {
 			throw new IllegalStateException("Model needs to be created first.");
-		}
-		if (positions.isEmpty()) {
-			throw new IllegalStateException("Mesh data needs to be generated first.");
 		}
 		GL30.glBindVertexArray(vertexArrayID);
 		GL20.glDisableVertexAttribArray(0);
@@ -339,13 +334,21 @@ public class Doxel {
 	}
 
 	/**
-	 * Set the background color.
+	 * Gets the background color.
+	 *
+	 * @return The background color.
+	 */
+	public static Color backgroundColor() {
+		return backgroundColor;
+	}
+
+	/**
+	 * Sets the background color.
 	 *
 	 * @param color The background color.
 	 */
 	public static void backgroundColor(Color color) {
-		GL11.glClearColor(color.getRed() / 255f, color.getGreen() / 255f,
-				color.getBlue() / 255f, color.getAlpha() / 255f);
+		backgroundColor = color;
 	}
 
 	/**
@@ -489,7 +492,7 @@ public class Doxel {
 	 *
 	 * @return The light distance attenuation factor.
 	 */
-	public static float lightDistanceAttenuationFactor() {
+	public static float lightAttenuation() {
 		return lightAttenuation;
 	}
 
@@ -497,10 +500,10 @@ public class Doxel {
 	 * Sets the light distance attenuation factor. In other terms, how much distance affects light
 	 * intensity. Larger values affect it more. 0.12 is the default value.
 	 *
-	 * @param factor The light distance attenuation factor.
+	 * @param attenuation The light distance attenuation factor.
 	 */
-	public static void lightDistanceAttenuationFactor(float factor) {
-		lightAttenuation = factor;
+	public static void lightAttenuation(float attenuation) {
+		lightAttenuation = attenuation;
 	}
 
 	/**

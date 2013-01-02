@@ -1,0 +1,18 @@
+Input:
+    MouseSensitivity: 0.01
+    CameraSpeed: 0.4
+Appearance:
+    WindowTitle: Doxel
+    WindowSize: 1200, 800
+    FieldOfView: 75
+    BackgroundColor: 0.2, 0.2, 0.2
+    ModelColor: 1, 0.1, 0.1
+    LightIntensity: 0.9, 0.9, 0.9
+    AmbientIntensity: 0.1, 0.1, 0.1
+    LightAttenuation: 0.12
+Model:
+    ModelPosition: -15, -15, -15
+    ModelSize: 30, 30, 30
+    MeshResolution: 0.5
+NoiseSource:
+    Path: default_noise_source.jar
