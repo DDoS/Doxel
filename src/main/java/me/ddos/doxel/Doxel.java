@@ -58,7 +58,7 @@ public class Doxel {
 	private static int programID = 0;
 	// Model data
 	private static float meshResolution = 0.5f;
-	private static NoiseSource noiseSource = new SimplePerlinNoiseSource(0.05);
+	private static NoiseSource noiseSource;
 	private static Polygonizer polygonizer = new MarchingCubesPolygonizer();
 	private static final TFloatList positions = new TFloatArrayList();
 	private static final TFloatList normals = new TFloatArrayList();
@@ -205,6 +205,9 @@ public class Doxel {
 	 * @param sizeZ The size on the z axis of the model.
 	 */
 	public static void generateModelMesh(float x, float y, float z, float sizeX, float sizeY, float sizeZ) {
+		if (noiseSource == null) {
+			throw new IllegalStateException("Noise source must be defined first.");
+		}
 		final GridCell cell = new GridCell();
 		for (float xx = x; xx < x + sizeX; xx += meshResolution) {
 			for (float yy = y; yy < y + sizeY; yy += meshResolution) {

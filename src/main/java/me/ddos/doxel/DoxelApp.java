@@ -53,8 +53,10 @@ public class DoxelApp {
 			if (plugin != null) {
 				plugin.load();
 			}
+			System.out.print("Generating the model mesh from the noise source...");
 			Doxel.generateModelMesh(modelPosition.x, modelPosition.y, modelPosition.z,
 					modelSize.x, modelSize.y, modelSize.z);
+			System.out.println(" done.");
 			Doxel.create(windowTitle, windowWidth, windowHeight, fieldOfView);
 			Doxel.createModel();
 			Mouse.setGrabbed(true);
@@ -103,7 +105,7 @@ public class DoxelApp {
 			};
 			osPath = "linux/";
 		} else {
-			throw new IllegalStateException("Could not get lwjgl natives for OS \"" + SystemUtils.OS_NAME + "\"");
+			throw new IllegalStateException("Could not get lwjgl natives for OS \"" + SystemUtils.OS_NAME + "\".");
 		}
 		final File nativesDir = new File("natives" + File.separator + osPath);
 		nativesDir.mkdirs();
@@ -144,7 +146,7 @@ public class DoxelApp {
 			Doxel.meshResolution(((Number) model.get("MeshResolution")).floatValue());
 			pluginPath = noiseSource.get("Path").toString();
 		} catch (Exception ex) {
-			throw new IllegalStateException("Malformed config.yml: \"" + ex.getMessage() + "\"");
+			throw new IllegalStateException("Malformed config.yml: \"" + ex.getMessage() + "\".");
 		}
 	}
 
@@ -152,22 +154,22 @@ public class DoxelApp {
 	private static void loadPlugin() throws Exception {
 		final File pluginFile = new File(pluginPath);
 		if (!pluginFile.exists()) {
-			return;
+			throw new IllegalStateException("Plugin \"" + pluginPath + "\" could not be found.");
 		}
 		final URLClassLoader classLoader = new URLClassLoader(new URL[]{pluginFile.toURI().toURL()});
 		final InputStream infoStream = classLoader.getResourceAsStream("plugin.yml");
 		if (infoStream == null) {
-			throw new IllegalStateException("Plugin \"" + pluginPath + "\" is missing its plugin.yml");
+			throw new IllegalStateException("Plugin \"" + pluginPath + "\" is missing its plugin.yml.");
 		}
 		final Map info = (Map) new Yaml().load(infoStream);
 		if (!info.containsKey("MainClass")) {
-			throw new IllegalStateException("Plugin \"" + pluginPath + "\" has an invalid plugin.yml");
+			throw new IllegalStateException("Plugin \"" + pluginPath + "\" has an invalid plugin.yml.");
 		}
 		final String mainClassName = info.get("MainClass").toString();
 		final Object mainClass = classLoader.loadClass(mainClassName).newInstance();
 		if (!(mainClass instanceof DoxelPlugin)) {
 			throw new IllegalStateException("Main class \'" + mainClassName + "\" from plugin \""
-					+ pluginPath + "\" does not implement \"DoxelPlugin\"");
+					+ pluginPath + "\" does not implement \"DoxelPlugin\".");
 		}
 		plugin = (DoxelPlugin) mainClass;
 	}
