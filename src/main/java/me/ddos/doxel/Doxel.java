@@ -176,7 +176,7 @@ public class Doxel {
 		diffuseColorLocation = GL20.glGetUniformLocation(programID, "diffuseColor");
 		lightIntensityLocation = GL20.glGetUniformLocation(programID, "lightIntensity");
 		ambientIntensityLocation = GL20.glGetUniformLocation(programID, "ambientIntensity");
-		modelSpaceLightPositionLocation = GL20.glGetUniformLocation(programID, "modelSpaceLightPos");
+		modelSpaceLightPositionLocation = GL20.glGetUniformLocation(programID, "modelSpaceLightPosition");
 		lightAttenuationLocation = GL20.glGetUniformLocation(programID, "lightAttenuation");
 		GL20.glValidateProgram(programID);
 		checkForOpenGLError("createShaders");

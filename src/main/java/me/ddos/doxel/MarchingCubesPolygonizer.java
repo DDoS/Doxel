@@ -395,7 +395,7 @@ public class MarchingCubesPolygonizer implements Polygonizer {
 
 			final Vector3f v0 = Vector3f.sub(p1, p0, null);
 			final Vector3f v1 = Vector3f.sub(p2, p0, null);
-			Vector3f.cross(v0, v1, v0);
+			Vector3f.cross(v0, v1, v0).normalise(v0);
 			normals.add(v0.x);
 			normals.add(v0.y);
 			normals.add(v0.z);
