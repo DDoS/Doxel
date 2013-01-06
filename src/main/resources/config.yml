@@ -14,12 +14,14 @@ Appearance:
     BackgroundColor: 0.2, 0.2, 0.2
     # Model color in RGB floats.
     ModelColor: 1, 0.1, 0.1
-    # Light intensity in each RGB floats component.
-    LightIntensity: 0.9, 0.9, 0.9
+    # Diffuse intensity in each RGB floats component.
+    DiffuseIntensity: 0.9
+    # Specular intensity in each RGB floats component.
+    SpecularIntensity: 0.3
     # Ambient light intensity in each floats RGB component.
-    AmbientIntensity: 0.1, 0.1, 0.1
+    AmbientIntensity: 0.1
     # How much distance affects light intensity.
-    LightAttenuation: 0.12
+    LightAttenuation: 0.9
 Model:
     # Position of the model in floats.
     ModelPosition: -15, -15, -15

@@ -66,26 +66,27 @@ public class Doxel {
 	private static int index = 0;
 	private static int renderingIndicesCount;
 	// Shader data
-	private static int modelToCameraMatrixLocation;
-	private static int normalModelToCameraMatrixLocation;
-	private static int cameraToClipMatrixLocation;
-	private static int diffuseColorLocation;
-	private static int lightIntensityLocation;
+	private static int viewMatrixLocation;
+	private static int projectionMatrixLocation;
+	private static int modelColorLocation;
+	private static int diffuseIntensityLocation;
+	private static int specularIntensityLocation;
 	private static int ambientIntensityLocation;
-	private static int modelSpaceLightPositionLocation;
+	private static int lightPositionLocation;
 	private static int lightAttenuationLocation;
 	private static Vector3f modelPosition = new Vector3f(0, 0, 0);
 	private static Quaternion modelRotation = new Quaternion();
 	private static final Matrix4f modelRotationMatrix = new Matrix4f();
 	private static final Matrix4f modelPositionMatrix = new Matrix4f();
-	private static final Matrix4f modelToCameraMatrix = new Matrix4f();
-	private static final Matrix4f cameraToClipMatrix = new Matrix4f();
+	private static final Matrix4f viewMatrix = new Matrix4f();
+	private static final Matrix4f projectionMatrix = new Matrix4f();
 	private static Vector3f lightPosition = new Vector3f(0, 0, 0);
-	private static Color lightIntensity = new Color(0.9f, 0.9f, 0.9f, 1);
-	private static Color ambientIntensity = new Color(0.1f, 0.1f, 0.1f, 1);
-	private static Color diffuseColor = new Color(1, 0.1f, 0.1f, 1);
+	private static Color modelColor = new Color(1, 0.1f, 0.1f, 1);
+	private static float diffuseIntensity = 0.9f;
+	private static float specularIntensity = 1;
+	private static float ambientIntensity = 0.1f;
 	private static Color backgroundColor = new Color(0.2f, 0.2f, 0.2f, 0);
-	private static float lightAttenuation = 0.12f;
+	private static float lightAttenuation = 0.9f;
 
 	private Doxel() {
 	}
@@ -154,11 +155,11 @@ public class Doxel {
 		final float y_scale = (float) (1 / Math.tan(Math.toRadians(fieldOfView / 2)));
 		final float x_scale = y_scale / aspectRatio;
 		final float frustum_length = far_plane - near_plane;
-		cameraToClipMatrix.m00 = x_scale;
-		cameraToClipMatrix.m11 = y_scale;
-		cameraToClipMatrix.m22 = -((far_plane + near_plane) / frustum_length);
-		cameraToClipMatrix.m23 = -1;
-		cameraToClipMatrix.m32 = -((2 * near_plane * far_plane) / frustum_length);
+		projectionMatrix.m00 = x_scale;
+		projectionMatrix.m11 = y_scale;
+		projectionMatrix.m22 = -((far_plane + near_plane) / frustum_length);
+		projectionMatrix.m23 = -1;
+		projectionMatrix.m32 = -((2 * near_plane * far_plane) / frustum_length);
 	}
 
 	private static void createShaders() {
@@ -170,13 +171,13 @@ public class Doxel {
 		GL20.glAttachShader(programID, vertexShaderID);
 		GL20.glAttachShader(programID, fragementShaderID);
 		GL20.glLinkProgram(programID);
-		modelToCameraMatrixLocation = GL20.glGetUniformLocation(programID, "modelToCameraMatrix");
-		normalModelToCameraMatrixLocation = GL20.glGetUniformLocation(programID, "normalModelToCameraMatrix");
-		cameraToClipMatrixLocation = GL20.glGetUniformLocation(programID, "cameraToClipMatrix");
-		diffuseColorLocation = GL20.glGetUniformLocation(programID, "diffuseColor");
-		lightIntensityLocation = GL20.glGetUniformLocation(programID, "lightIntensity");
+		viewMatrixLocation = GL20.glGetUniformLocation(programID, "viewMatrix");
+		projectionMatrixLocation = GL20.glGetUniformLocation(programID, "projectionMatrix");
+		modelColorLocation = GL20.glGetUniformLocation(programID, "modelColor");
+		diffuseIntensityLocation = GL20.glGetUniformLocation(programID, "diffuseIntensity");
+		specularIntensityLocation = GL20.glGetUniformLocation(programID, "specularIntensity");
 		ambientIntensityLocation = GL20.glGetUniformLocation(programID, "ambientIntensity");
-		modelSpaceLightPositionLocation = GL20.glGetUniformLocation(programID, "modelSpaceLightPosition");
+		lightPositionLocation = GL20.glGetUniformLocation(programID, "lightPosition");
 		lightAttenuationLocation = GL20.glGetUniformLocation(programID, "lightAttenuation");
 		GL20.glValidateProgram(programID);
 		checkForOpenGLError("createShaders");
@@ -363,31 +364,25 @@ public class Doxel {
 		modelRotationMatrix.m23 = 0;
 		modelPositionMatrix.setIdentity();
 		Matrix4f.translate(modelPosition, modelPositionMatrix, modelPositionMatrix);
-		Matrix4f.mul(modelRotationMatrix, modelPositionMatrix, modelToCameraMatrix);
+		Matrix4f.mul(modelRotationMatrix, modelPositionMatrix, viewMatrix);
 		logicRanOnce = true;
 	}
 
 	private static void preRender() {
 		final FloatBuffer matrix44Buffer = BufferUtils.createFloatBuffer(16);
-		modelToCameraMatrix.store(matrix44Buffer);
+		viewMatrix.store(matrix44Buffer);
 		matrix44Buffer.flip();
-		GL20.glUniformMatrix4(modelToCameraMatrixLocation, false, matrix44Buffer);
+		GL20.glUniformMatrix4(viewMatrixLocation, false, matrix44Buffer);
 		matrix44Buffer.clear();
-		cameraToClipMatrix.store(matrix44Buffer);
+		projectionMatrix.store(matrix44Buffer);
 		matrix44Buffer.flip();
-		GL20.glUniformMatrix4(cameraToClipMatrixLocation, false, matrix44Buffer);
-		final FloatBuffer matrix33Buffer = BufferUtils.createFloatBuffer(9);
-		modelToCameraMatrix.store3f(matrix33Buffer);
-		matrix33Buffer.flip();
-		GL20.glUniformMatrix3(normalModelToCameraMatrixLocation, false, matrix33Buffer);
-		GL20.glUniform4f(diffuseColorLocation, modelColor().getRed() / 255f, modelColor().getGreen() / 255f,
+		GL20.glUniformMatrix4(projectionMatrixLocation, false, matrix44Buffer);
+		GL20.glUniform4f(modelColorLocation, modelColor().getRed() / 255f, modelColor().getGreen() / 255f,
 				modelColor().getBlue() / 255f, modelColor().getAlpha() / 255f);
-		GL20.glUniform4f(lightIntensityLocation, lightIntensity.getRed() / 255f, lightIntensity.getGreen() / 255f,
-				lightIntensity.getBlue() / 255f, lightIntensity.getAlpha() / 255f);
-		GL20.glUniform4f(ambientIntensityLocation, ambientIntensity.getRed() / 255f, ambientIntensity.getGreen() / 255f,
-				ambientIntensity.getBlue() / 255f, ambientIntensity.getAlpha() / 255f);
-		GL20.glUniform3f(modelSpaceLightPositionLocation, lightPosition.x, lightPosition.y,
-				lightPosition.z);
+		GL20.glUniform1f(diffuseIntensityLocation, diffuseIntensity);
+		GL20.glUniform1f(specularIntensityLocation, specularIntensity);
+		GL20.glUniform1f(ambientIntensityLocation, ambientIntensity);
+		GL20.glUniform3f(lightPositionLocation, lightPosition.x, lightPosition.y, lightPosition.z);
 		GL20.glUniform1f(lightAttenuationLocation, lightAttenuation);
 		checkForOpenGLError("preRender");
 	}
@@ -450,7 +445,7 @@ public class Doxel {
 	 * @return The model color.
 	 */
 	public static Color modelColor() {
-		return diffuseColor;
+		return modelColor;
 	}
 
 	/**
@@ -459,7 +454,7 @@ public class Doxel {
 	 * @param color The model color.
 	 */
 	public static void modelColor(Color color) {
-		diffuseColor = color;
+		modelColor = color;
 	}
 
 	/**
@@ -544,44 +539,62 @@ public class Doxel {
 	}
 
 	/**
-	 * Sets the light color. This also represents its intensity.
+	 * Sets the diffuse intensity.
 	 *
-	 * @param color The light color and intensity.
+	 * @param intensity The diffuse intensity.
 	 */
-	public static void lightColor(Color color) {
-		lightIntensity = color;
+	public static void diffuseIntensity(float intensity) {
+		diffuseIntensity = intensity;
 	}
 
 	/**
-	 * Gets the light color. This also represents its intensity.
+	 * Gets the diffuse intensity.
 	 *
-	 * @return The light color and intensity.
+	 * @return The diffuse intensity.
 	 */
-	public static Color lightColor() {
-		return lightIntensity;
+	public static float diffuseIntensity() {
+		return diffuseIntensity;
 	}
 
 	/**
-	 * Sets the ambient light color. This also represents its intensity.
+	 * Sets the specular intensity.
 	 *
-	 * @param color The ambient light color and intensity.
+	 * @param intensity specular The intensity.
 	 */
-	public static void ambientLightColor(Color color) {
-		ambientIntensity = color;
+	public static void specularIntensity(float intensity) {
+		specularIntensity = intensity;
 	}
 
 	/**
-	 * Gets the ambient light color. This also represents its intensity.
+	 * Gets specular intensity.
 	 *
-	 * @return The ambient light color and intensity.
+	 * @return The specular intensity.
 	 */
-	public static Color ambientLightColor() {
+	public static float specularIntensity() {
+		return specularIntensity;
+	}
+
+	/**
+	 * Sets the ambient intensity.
+	 *
+	 * @param intensity The ambient intensity.
+	 */
+	public static void ambientIntensity(float intensity) {
+		ambientIntensity = intensity;
+	}
+
+	/**
+	 * Gets the ambient intensity.
+	 *
+	 * @return The ambient intensity.
+	 */
+	public static float ambientIntensity() {
 		return ambientIntensity;
 	}
 
 	/**
 	 * Gets the light distance attenuation factor. In other terms, how much distance affects light
-	 * intensity. Larger values affect it more. 0.12 is the default value.
+	 * intensity. Larger values affect it more. 0.9 is the default value.
 	 *
 	 * @return The light distance attenuation factor.
 	 */

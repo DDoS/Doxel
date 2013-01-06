@@ -138,8 +138,9 @@ public class DoxelApp {
 			fieldOfView = ((Number) appearance.get("FieldOfView")).floatValue();
 			Doxel.backgroundColor(parseColor(((String) appearance.get("BackgroundColor")), 0));
 			Doxel.modelColor(parseColor(((String) appearance.get("ModelColor")), 1));
-			Doxel.lightColor(parseColor(((String) appearance.get("LightIntensity")), 1));
-			Doxel.ambientLightColor(parseColor(((String) appearance.get("AmbientIntensity")), 1));
+			Doxel.diffuseIntensity(((Number) appearance.get("DiffuseIntensity")).floatValue());
+			Doxel.specularIntensity(((Number) appearance.get("SpecularIntensity")).floatValue());
+			Doxel.ambientIntensity(((Number) appearance.get("AmbientIntensity")).floatValue());
 			Doxel.lightAttenuation(((Number) appearance.get("LightAttenuation")).floatValue());
 			parseVector(((String) model.get("ModelPosition")), modelPosition);
 			parseVector(((String) model.get("ModelSize")), modelSize);
