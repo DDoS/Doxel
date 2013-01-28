@@ -1,25 +1,20 @@
 package me.ddos.doxel;
 
-import gnu.trove.list.TFloatList;
-import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TFloatArrayList;
-import gnu.trove.list.array.TIntArrayList;
 import java.awt.Color;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.opengl.ContextAttribs;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
-import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL32;
 import org.lwjgl.opengl.OpenGLException;
 import org.lwjgl.opengl.PixelFormat;
@@ -39,34 +34,19 @@ import org.lwjgl.util.vector.Vector4f;
  * @author DDoS
  */
 public class Doxel {
-	// Vertex info
-	private static final byte POSITION_COMPONENT_COUNT = 3;
-	private static final byte NORMAL_COMPONENT_COUNT = 3;
 	// States
-	private static boolean isDisplayCreated = false;
-	private static boolean isModelCreated = false;
-	private static boolean logicRanOnce = false;
+	private static boolean created = false;
 	// Renderer data
 	private static int windowWidth;
 	private static int windowHeight;
-	private static int vertexArrayID = 0;
-	private static int positionsBufferID = 0;
-	private static int normalsBufferID = 0;
-	private static int vertexIndexBufferID = 0;
 	private static int vertexShaderID = 0;
 	private static int fragementShaderID = 0;
 	private static int programID = 0;
 	// Model data
-	private static float meshResolution = 0.5f;
-	private static NoiseSource noiseSource;
-	private static Polygonizer polygonizer = new MarchingCubesPolygonizer();
-	private static final TFloatList positions = new TFloatArrayList();
-	private static final TFloatList normals = new TFloatArrayList();
-	private static final TIntList indices = new TIntArrayList();
-	private static int index = 0;
-	private static int renderingIndicesCount;
+	private static final List<Model> models = new ArrayList<Model>();
 	// Shader data
-	private static int viewMatrixLocation;
+	private static int modelMatrixLocation;
+	private static int cameraMatrixLocation;
 	private static int projectionMatrixLocation;
 	private static int modelColorLocation;
 	private static int diffuseIntensityLocation;
@@ -74,14 +54,16 @@ public class Doxel {
 	private static int ambientIntensityLocation;
 	private static int lightPositionLocation;
 	private static int lightAttenuationLocation;
-	private static Vector3f modelPosition = new Vector3f(0, 0, 0);
-	private static Quaternion modelRotation = new Quaternion();
-	private static final Matrix4f modelRotationMatrix = new Matrix4f();
-	private static final Matrix4f modelPositionMatrix = new Matrix4f();
-	private static final Matrix4f viewMatrix = new Matrix4f();
+	// Camera
 	private static final Matrix4f projectionMatrix = new Matrix4f();
+	private static Vector3f cameraPosition = new Vector3f(0, 0, 0);
+	private static Quaternion cameraRotation = new Quaternion();
+	private static final Matrix4f cameraRotationMatrix = new Matrix4f();
+	private static final Matrix4f cameraPositionMatrix = new Matrix4f();
+	private static final Matrix4f cameraMatrix = new Matrix4f();
+	private static boolean updateCameraMatrix = true;
+	// Lighting
 	private static Vector3f lightPosition = new Vector3f(0, 0, 0);
-	private static Color modelColor = new Color(1, 0.1f, 0.1f, 1);
 	private static float diffuseIntensity = 0.9f;
 	private static float specularIntensity = 1;
 	private static float ambientIntensity = 0.1f;
@@ -101,24 +83,29 @@ public class Doxel {
 	 */
 	public static void create(String title, int windowWidth, int windowHeight, float fieldOfView)
 			throws LWJGLException {
+		if (created) {
+			throw new IllegalStateException("Doxel has already been created.");
+		}
 		createDisplay(title, windowWidth, windowHeight);
 		createProjection(fieldOfView);
 		createShaders();
+		created = true;
 	}
 
 	/**
-	 * Destroys the render window and its resources.
+	 * Destroys the render window and the models.
 	 */
 	public static void destroy() {
-		destroyModel();
+		if (!created) {
+			throw new IllegalStateException("Doxel has not been created yet.");
+		}
+		destroyModels();
 		destroyShaders();
 		destroyDisplay();
+		created = false;
 	}
 
 	private static void createDisplay(String title, int width, int height) throws LWJGLException {
-		if (isDisplayCreated) {
-			throw new IllegalStateException("Display has already been created.");
-		}
 		windowWidth = width;
 		windowHeight = height;
 		final PixelFormat pixelFormat = new PixelFormat();
@@ -132,20 +119,7 @@ public class Doxel {
 		GL11.glEnable(GL11.GL_DEPTH_TEST);
 		GL11.glEnable(GL32.GL_DEPTH_CLAMP);
 		GL11.glDepthMask(true);
-		isDisplayCreated = true;
 		checkForOpenGLError("createDisplay");
-	}
-
-	private static void destroyDisplay() {
-		if (!isDisplayCreated) {
-			throw new IllegalStateException("Display has not been created yet.");
-		}
-		GL11.glDisable(GL11.GL_DEPTH_TEST);
-		GL11.glDepthMask(false);
-		GL11.glDisable(GL11.GL_CULL_FACE);
-		checkForOpenGLError("destroyDisplay");
-		Display.destroy();
-		isDisplayCreated = false;
 	}
 
 	private static void createProjection(float fieldOfView) {
@@ -171,7 +145,8 @@ public class Doxel {
 		GL20.glAttachShader(programID, vertexShaderID);
 		GL20.glAttachShader(programID, fragementShaderID);
 		GL20.glLinkProgram(programID);
-		viewMatrixLocation = GL20.glGetUniformLocation(programID, "viewMatrix");
+		modelMatrixLocation = GL20.glGetUniformLocation(programID, "modelMatrix");
+		cameraMatrixLocation = GL20.glGetUniformLocation(programID, "cameraMatrix");
 		projectionMatrixLocation = GL20.glGetUniformLocation(programID, "projectionMatrix");
 		modelColorLocation = GL20.glGetUniformLocation(programID, "modelColor");
 		diffuseIntensityLocation = GL20.glGetUniformLocation(programID, "diffuseIntensity");
@@ -181,6 +156,14 @@ public class Doxel {
 		lightAttenuationLocation = GL20.glGetUniformLocation(programID, "lightAttenuation");
 		GL20.glValidateProgram(programID);
 		checkForOpenGLError("createShaders");
+	}
+
+	private static void destroyDisplay() {
+		GL11.glDisable(GL11.GL_DEPTH_TEST);
+		GL11.glDepthMask(false);
+		GL11.glDisable(GL11.GL_CULL_FACE);
+		checkForOpenGLError("destroyDisplay");
+		Display.destroy();
 	}
 
 	private static void destroyShaders() {
@@ -193,192 +176,45 @@ public class Doxel {
 		checkForOpenGLError("destroyShaders");
 	}
 
-	/**
-	 * Generates the model's mesh from the noise source using the provided polygonizer. Default
-	 * noise source is a {@link SimplePerlinNoiseSource} with a frequeny of 0.05. Default
-	 * polygonizer is the {@link MarchingCubesPolygonizer}.
-	 *
-	 * @param x The x coordinate of the position of the model.
-	 * @param y The y coordinate of the position of the model.
-	 * @param z The z coordinate of the position of the model.
-	 * @param sizeX The size on the x axis of the model.
-	 * @param sizeY The size on the y axis of the model.
-	 * @param sizeZ The size on the z axis of the model.
-	 */
-	public static void generateModelMesh(float x, float y, float z, float sizeX, float sizeY, float sizeZ) {
-		if (noiseSource == null) {
-			throw new IllegalStateException("Noise source must be defined first.");
+	private static void destroyModels() {
+		for (Model model : models) {
+			model.destroy();
 		}
-		final GridCell cell = new GridCell();
-		for (float xx = x; xx < x + sizeX; xx += meshResolution) {
-			for (float yy = y; yy < y + sizeY; yy += meshResolution) {
-				for (float zz = z; zz < z + sizeZ; zz += meshResolution) {
-					cell.p0.set(xx, yy, zz);
-					cell.p1.set(xx + meshResolution, yy, zz);
-					cell.p2.set(xx + meshResolution, yy, zz + meshResolution);
-					cell.p3.set(xx, yy, zz + meshResolution);
-					cell.p4.set(xx, yy + meshResolution, zz);
-					cell.p5.set(xx + meshResolution, yy + meshResolution, zz);
-					cell.p6.set(xx + meshResolution, yy + meshResolution, zz + meshResolution);
-					cell.p7.set(xx, yy + meshResolution, zz + meshResolution);
-					cell.v0 = noiseSource.noise(xx, yy, zz);
-					cell.v1 = noiseSource.noise(xx + meshResolution, yy, zz);
-					cell.v2 = noiseSource.noise(xx + meshResolution, yy, zz + meshResolution);
-					cell.v3 = noiseSource.noise(xx, yy, zz + meshResolution);
-					cell.v4 = noiseSource.noise(xx, yy + meshResolution, zz);
-					cell.v5 = noiseSource.noise(xx + meshResolution, yy + meshResolution, zz);
-					cell.v6 = noiseSource.noise(xx + meshResolution, yy + meshResolution, zz + meshResolution);
-					cell.v7 = noiseSource.noise(xx, yy + meshResolution, zz + meshResolution);
-					index = polygonizer.polygonize(cell, positions, normals, indices, index);
-				}
-			}
-		}
+		models.clear();
 	}
 
-	/**
-	 * Delete all the model mesh generated so far.
-	 */
-	public static void deleteModelMesh() {
-		positions.clear();
-		normals.clear();
-		indices.clear();
-		index = 0;
+	private static Matrix4f cameraMatrix() {
+		if (updateCameraMatrix) {
+			cameraRotationMatrix.setIdentity();
+			cameraRotationMatrix.m00 = 1 - 2 * cameraRotation.y * cameraRotation.y - 2 * cameraRotation.z * cameraRotation.z;
+			cameraRotationMatrix.m01 = 2 * cameraRotation.x * cameraRotation.y - 2 * cameraRotation.w * cameraRotation.z;
+			cameraRotationMatrix.m02 = 2 * cameraRotation.x * cameraRotation.z + 2 * cameraRotation.w * cameraRotation.y;
+			cameraRotationMatrix.m03 = 0;
+			cameraRotationMatrix.m10 = 2 * cameraRotation.x * cameraRotation.y + 2 * cameraRotation.w * cameraRotation.z;
+			cameraRotationMatrix.m11 = 1 - 2 * cameraRotation.x * cameraRotation.x - 2 * cameraRotation.z * cameraRotation.z;
+			cameraRotationMatrix.m12 = 2 * cameraRotation.y * cameraRotation.z - 2 * cameraRotation.w * cameraRotation.x;
+			cameraRotationMatrix.m13 = 0;
+			cameraRotationMatrix.m20 = 2 * cameraRotation.x * cameraRotation.z - 2 * cameraRotation.w * cameraRotation.y;
+			cameraRotationMatrix.m21 = 2 * cameraRotation.y * cameraRotation.z + 2.f * cameraRotation.x * cameraRotation.w;
+			cameraRotationMatrix.m22 = 1 - 2 * cameraRotation.x * cameraRotation.x - 2 * cameraRotation.y * cameraRotation.y;
+			cameraRotationMatrix.m23 = 0;
+			cameraPositionMatrix.setIdentity();
+			Matrix4f.translate(cameraPosition, cameraPositionMatrix, cameraPositionMatrix);
+			Matrix4f.mul(cameraRotationMatrix, cameraPositionMatrix, cameraMatrix);
+			updateCameraMatrix = false;
+		}
+		return cameraMatrix;
 	}
 
-	/**
-	 * Creates the model from it's mesh. Must be called after mesh is generated using {@link #generateModelMesh}.
-	 *
-	 * @throws IllegalStateException If the display wasn't created first. If the model has already
-	 * been created.
-	 */
-	public static void createModel() {
-		if (!isDisplayCreated) {
-			throw new IllegalStateException("Display needs to be created first.");
-		}
-		if (isModelCreated) {
-			throw new IllegalStateException("Model has already been created.");
-		}
-		vertexIndexBufferID = GL15.glGenBuffers();
-		GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, vertexIndexBufferID);
-		GL15.glBufferData(GL15.GL_ELEMENT_ARRAY_BUFFER, indicesBuffer(), GL15.GL_STATIC_DRAW);
-		GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
-		renderingIndicesCount = indices.size();
-		positionsBufferID = GL15.glGenBuffers();
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, positionsBufferID);
-		GL15.glBufferData(GL15.GL_ARRAY_BUFFER, positionsBuffer(), GL15.GL_STATIC_DRAW);
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-		normalsBufferID = GL15.glGenBuffers();
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, normalsBufferID);
-		GL15.glBufferData(GL15.GL_ARRAY_BUFFER, normalsBuffer(), GL15.GL_STATIC_DRAW);
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-		vertexArrayID = GL30.glGenVertexArrays();
-		GL30.glBindVertexArray(vertexArrayID);
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, positionsBufferID);
-		GL20.glVertexAttribPointer(0, POSITION_COMPONENT_COUNT, GL11.GL_FLOAT, false, 0, 0);
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, normalsBufferID);
-		GL20.glVertexAttribPointer(1, NORMAL_COMPONENT_COUNT, GL11.GL_FLOAT, false, 0, 0);
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-		GL30.glBindVertexArray(0);
-		isModelCreated = true;
-		checkForOpenGLError("createModel");
-	}
-
-	/**
-	 * Updates the model. Deletes old model resources and creates new ones from the mesh. Does not
-	 * delete the model mesh.
-	 *
-	 * @throws IllegalStateException If the display wasn't created first.
-	 */
-	public static void updateModel() {
-		if (!isModelCreated) {
-			throw new IllegalStateException("Model needs to be created first.");
-		}
-		GL30.glBindVertexArray(vertexArrayID);
-		GL20.glDisableVertexAttribArray(0);
-		GL20.glDisableVertexAttribArray(1);
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-		GL15.glDeleteBuffers(positionsBufferID);
-		GL15.glDeleteBuffers(normalsBufferID);
-		GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
-		GL15.glDeleteBuffers(vertexIndexBufferID);
-		vertexIndexBufferID = GL15.glGenBuffers();
-		GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, vertexIndexBufferID);
-		GL15.glBufferData(GL15.GL_ELEMENT_ARRAY_BUFFER, indicesBuffer(), GL15.GL_STATIC_DRAW);
-		GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
-		renderingIndicesCount = indices.size();
-		positionsBufferID = GL15.glGenBuffers();
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, positionsBufferID);
-		GL15.glBufferData(GL15.GL_ARRAY_BUFFER, positionsBuffer(), GL15.GL_STATIC_DRAW);
-		GL20.glVertexAttribPointer(0, POSITION_COMPONENT_COUNT, GL11.GL_FLOAT, false, 0, 0);
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-		normalsBufferID = GL15.glGenBuffers();
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, normalsBufferID);
-		GL15.glBufferData(GL15.GL_ARRAY_BUFFER, normalsBuffer(), GL15.GL_STATIC_DRAW);
-		GL20.glVertexAttribPointer(1, NORMAL_COMPONENT_COUNT, GL11.GL_FLOAT, false, 0, 0);
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-		GL30.glBindVertexArray(0);
-		checkForOpenGLError("updateModel");
-	}
-
-	private static void destroyModel() {
-		if (!isModelCreated) {
-			return;
-		}
-		GL30.glBindVertexArray(vertexArrayID);
-		GL20.glDisableVertexAttribArray(0);
-		GL20.glDisableVertexAttribArray(1);
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-		GL15.glDeleteBuffers(positionsBufferID);
-		GL15.glDeleteBuffers(normalsBufferID);
-		GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
-		GL15.glDeleteBuffers(vertexIndexBufferID);
-		GL30.glBindVertexArray(0);
-		GL30.glDeleteVertexArrays(vertexArrayID);
-		renderingIndicesCount = 0;
-		isModelCreated = false;
-		checkForOpenGLError("destroyModel");
-	}
-
-	/**
-	 * The doLogic part of the rendering cycle. Generates the matrices for model to camera
-	 * transformation.
-	 *
-	 * @throws IllegalStateException If the display wasn't created first.
-	 */
-	public static void doLogic() {
-		if (!isDisplayCreated) {
-			throw new IllegalStateException("Display needs to be created first.");
-		}
-		modelRotationMatrix.setIdentity();
-		modelRotationMatrix.m00 = 1 - 2 * modelRotation.y * modelRotation.y - 2 * modelRotation.z * modelRotation.z;
-		modelRotationMatrix.m01 = 2 * modelRotation.x * modelRotation.y - 2 * modelRotation.w * modelRotation.z;
-		modelRotationMatrix.m02 = 2 * modelRotation.x * modelRotation.z + 2 * modelRotation.w * modelRotation.y;
-		modelRotationMatrix.m03 = 0;
-		modelRotationMatrix.m10 = 2 * modelRotation.x * modelRotation.y + 2 * modelRotation.w * modelRotation.z;
-		modelRotationMatrix.m11 = 1 - 2 * modelRotation.x * modelRotation.x - 2 * modelRotation.z * modelRotation.z;
-		modelRotationMatrix.m12 = 2 * modelRotation.y * modelRotation.z - 2 * modelRotation.w * modelRotation.x;
-		modelRotationMatrix.m13 = 0;
-		modelRotationMatrix.m20 = 2 * modelRotation.x * modelRotation.z - 2 * modelRotation.w * modelRotation.y;
-		modelRotationMatrix.m21 = 2 * modelRotation.y * modelRotation.z + 2.f * modelRotation.x * modelRotation.w;
-		modelRotationMatrix.m22 = 1 - 2 * modelRotation.x * modelRotation.x - 2 * modelRotation.y * modelRotation.y;
-		modelRotationMatrix.m23 = 0;
-		modelPositionMatrix.setIdentity();
-		Matrix4f.translate(modelPosition, modelPositionMatrix, modelPositionMatrix);
-		Matrix4f.mul(modelRotationMatrix, modelPositionMatrix, viewMatrix);
-		logicRanOnce = true;
-	}
-
-	private static void preRender() {
-		final FloatBuffer matrix44Buffer = BufferUtils.createFloatBuffer(16);
-		viewMatrix.store(matrix44Buffer);
-		matrix44Buffer.flip();
-		GL20.glUniformMatrix4(viewMatrixLocation, false, matrix44Buffer);
-		matrix44Buffer.clear();
-		projectionMatrix.store(matrix44Buffer);
-		matrix44Buffer.flip();
-		GL20.glUniformMatrix4(projectionMatrixLocation, false, matrix44Buffer);
-		GL20.glUniform4f(modelColorLocation, modelColor().getRed() / 255f, modelColor().getGreen() / 255f,
-				modelColor().getBlue() / 255f, modelColor().getAlpha() / 255f);
+	private static void shaderData() {
+		final FloatBuffer matrixBuffer = BufferUtils.createFloatBuffer(16);
+		cameraMatrix().store(matrixBuffer);
+		matrixBuffer.flip();
+		GL20.glUniformMatrix4(cameraMatrixLocation, false, matrixBuffer);
+		matrixBuffer.clear();
+		projectionMatrix.store(matrixBuffer);
+		matrixBuffer.flip();
+		GL20.glUniformMatrix4(projectionMatrixLocation, false, matrixBuffer);
 		GL20.glUniform1f(diffuseIntensityLocation, diffuseIntensity);
 		GL20.glUniform1f(specularIntensityLocation, specularIntensity);
 		GL20.glUniform1f(ambientIntensityLocation, ambientIntensity);
@@ -387,38 +223,140 @@ public class Doxel {
 		checkForOpenGLError("preRender");
 	}
 
+	private static void shaderData(Model model) {
+		final FloatBuffer matrix44Buffer = BufferUtils.createFloatBuffer(16);
+		model.matrix().store(matrix44Buffer);
+		matrix44Buffer.flip();
+		GL20.glUniformMatrix4(modelMatrixLocation, false, matrix44Buffer);
+		GL20.glUniform4f(modelColorLocation,
+				model.color().getRed() / 255f, model.color().getGreen() / 255f,
+				model.color().getBlue() / 255f, model.color().getAlpha() / 255f);
+		checkForOpenGLError("preRenderModel");
+	}
+
 	/**
-	 * Displays the current model with the proper rotation and position to the render window.
+	 * Displays the models with to the render window.
 	 *
-	 * @throws IllegalStateException If the display wasn't created first. If the model wasn't
-	 * created first. If the doLogic wasn't created ran at least once before.
+	 * @throws IllegalStateException If the display wasn't created first or if no models were added.
 	 */
-	public static void render() {
-		if (!isDisplayCreated) {
+	protected static void render() {
+		if (!created) {
 			throw new IllegalStateException("Display needs to be created first.");
 		}
-		if (!isModelCreated) {
-			throw new IllegalStateException("Model needs to be created first.");
-		}
-		if (!logicRanOnce) {
-			throw new IllegalStateException("Logic needs to be run first at least once.");
+		if (models.isEmpty()) {
+			throw new IllegalStateException("At least one model needs to be created first.");
 		}
 		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
 		GL20.glUseProgram(programID);
-		preRender();
-		GL30.glBindVertexArray(vertexArrayID);
-		GL20.glEnableVertexAttribArray(0);
-		GL20.glEnableVertexAttribArray(1);
-		GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, vertexIndexBufferID);
-		GL11.glDrawElements(GL11.GL_TRIANGLES, renderingIndicesCount, GL11.GL_UNSIGNED_INT, 0);
-		GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
-		GL20.glDisableVertexAttribArray(0);
-		GL20.glDisableVertexAttribArray(1);
-		GL30.glBindVertexArray(0);
+		shaderData();
+		for (Model model : models) {
+			if (!model.created()) {
+				continue;
+			}
+			shaderData(model);
+			model.render();
+		}
 		GL20.glUseProgram(0);
 		Display.sync(60);
 		Display.update();
 		checkForOpenGLError("render");
+	}
+
+	/**
+	 * Returns true if the Doxel display has been created.
+	 *
+	 * @return True if the display and rendering resources have been creates, false if other wise.
+	 */
+	public static boolean created() {
+		return created;
+	}
+
+	/**
+	 * Adds a model to the list. If a non-created model is added to the list, it will not be
+	 * rendered until it is created.
+	 *
+	 * @param model The model to add
+	 */
+	public static void addModel(Model model) {
+		if (!models.contains(model)) {
+			models.add(model);
+		}
+	}
+
+	/**
+	 * Removes a model from the list
+	 *
+	 * @param model The model to remove
+	 */
+	public static void removeModel(Model model) {
+		models.remove(model);
+	}
+
+	/**
+	 * Gets the camera position.
+	 *
+	 * @return The camera position.
+	 */
+	public static Vector3f cameraPosition() {
+		updateCameraMatrix = true;
+		return cameraPosition;
+	}
+
+	/**
+	 * Sets the camera position.
+	 *
+	 * @param position The camera position.
+	 */
+	public static void cameraPosition(Vector3f position) {
+		cameraPosition = position;
+		updateCameraMatrix = true;
+	}
+
+	/**
+	 * Gets the camera rotation.
+	 *
+	 * @return The camera rotation.
+	 */
+	public static Quaternion cameraRotation() {
+		updateCameraMatrix = true;
+		return cameraRotation;
+	}
+
+	/**
+	 * Sets the camera rotation.
+	 *
+	 * @param rotation The camera rotation.
+	 */
+	public static void cameraRotation(Quaternion rotation) {
+		cameraRotation = rotation;
+		updateCameraMatrix = true;
+	}
+
+	/**
+	 * Gets the vector representing the right direction for the camera.
+	 *
+	 * @return The camera's right direction vector.
+	 */
+	public static Vector3f cameraRight() {
+		return toCamrera(new Vector3f(1, 0, 0));
+	}
+
+	/**
+	 * Gets the vector representing the up direction for the camera.
+	 *
+	 * @return The camera's up direction vector.
+	 */
+	public static Vector3f cameraUp() {
+		return toCamrera(new Vector3f(0, 1, 0));
+	}
+
+	/**
+	 * Gets the vector representing the forward direction for the camera.
+	 *
+	 * @return The camera's forward direction vector.
+	 */
+	public static Vector3f cameraForward() {
+		return toCamrera(new Vector3f(0, 0, 1));
 	}
 
 	/**
@@ -437,87 +375,6 @@ public class Doxel {
 	 */
 	public static void backgroundColor(Color color) {
 		backgroundColor = color;
-	}
-
-	/**
-	 * Gets the model color
-	 *
-	 * @return The model color.
-	 */
-	public static Color modelColor() {
-		return modelColor;
-	}
-
-	/**
-	 * Sets the model color.
-	 *
-	 * @param color The model color.
-	 */
-	public static void modelColor(Color color) {
-		modelColor = color;
-	}
-
-	/**
-	 * Gets the model position.
-	 *
-	 * @return The model position.
-	 */
-	public static Vector3f modelPosition() {
-		return modelPosition;
-	}
-
-	/**
-	 * Sets the model position.
-	 *
-	 * @param position The model position.
-	 */
-	public static void modelPosition(Vector3f position) {
-		modelPosition = position;
-	}
-
-	/**
-	 * Gets the model rotation.
-	 *
-	 * @return The model rotation.
-	 */
-	public static Quaternion modelRotation() {
-		return modelRotation;
-	}
-
-	/**
-	 * Sets the model rotation.
-	 *
-	 * @param rotation The model rotation.
-	 */
-	public static void modelRotation(Quaternion rotation) {
-		modelRotation = rotation;
-	}
-
-	/**
-	 * Gets the vector representing the right direction for the camera
-	 *
-	 * @return The camera's right direction vector.
-	 */
-	public static Vector3f cameraRight() {
-		return toCamera(new Vector3f(1, 0, 0));
-	}
-
-	/**
-	 * Gets the vector representing the up direction for the camera
-	 *
-	 * @return The camera's up direction vector.
-	 */
-	public static Vector3f cameraUp() {
-		return toCamera(new Vector3f(0, 1, 0));
-	}
-
-	/**
-	 * Gets the vector representing the forward direction for the camera
-	 *
-	 * @return The camera's forward direction vector.
-	 */
-	public static Vector3f cameraForward() {
-		return toCamera(new Vector3f(0, 0, 1));
 	}
 
 	/**
@@ -613,66 +470,12 @@ public class Doxel {
 	}
 
 	/**
-	 * Gets the mesh resolution. Used by {@link #generateModelMesh}. Smaller values mean higher
-	 * resolution meshes. 0.5 is the default value.
+	 * Checks for an OpenGL exception. If one is found, this method will throw a {@link org.lwjgl.opengl.OpenGLException}
+	 * which can be caught and handled.
 	 *
-	 * @return The mesh resolution.
+	 * @param step The rendering step at which this method is being called.
 	 */
-	public static float meshResolution() {
-		return meshResolution;
-	}
-
-	/**
-	 * Sets the mesh resolution. Used by {@link #generateModelMesh}. Smaller values mean higher
-	 * resolution meshes. 0.5 is the default value.
-	 *
-	 * @param resolution The mesh resolution.
-	 */
-	public static void meshResolution(float resolution) {
-		meshResolution = resolution;
-	}
-
-	/**
-	 * Gets the noise source. Used by {@link #generateModelMesh}.
-	 *
-	 * @return The noise source.
-	 * @see NoiseSource
-	 */
-	public static NoiseSource noiseSource() {
-		return noiseSource;
-	}
-
-	/**
-	 * Sets the noise source. Used by {@link #generateModelMesh}.
-	 *
-	 * @param source The noise source.
-	 * @see NoiseSource
-	 */
-	public static void noiseSource(NoiseSource source) {
-		noiseSource = source;
-	}
-
-	/**
-	 * Gets the polygonizer. Used by {@link #generateModelMesh}.
-	 *
-	 * @return The polygonizer.
-	 * @see Polygonizer
-	 */
-	public static Polygonizer polygonizer() {
-		return polygonizer;
-	}
-
-	/**
-	 * Sets the polygonizer. Used by {@link #generateModelMesh}.
-	 *
-	 * @param polygonizer The polygonizer.
-	 * @see Polygonizer
-	 */
-	public static void polygonizer(Polygonizer polygonizer) {
-		Doxel.polygonizer = polygonizer;
-	}
-
-	private static void checkForOpenGLError(String step) {
+	protected static void checkForOpenGLError(String step) {
 		final int errorValue = GL11.glGetError();
 		if (errorValue != GL11.GL_NO_ERROR) {
 			throw new OpenGLException("OPEN GL ERROR: " + step + ": " + GLU.gluErrorString(errorValue));
@@ -698,35 +501,13 @@ public class Doxel {
 		if (GL20.glGetShader(shaderID, GL20.GL_COMPILE_STATUS) == GL11.GL_FALSE) {
 			throw new OpenGLException("OPEN GL ERROR: Could not compile shader \"" + name + "\"\n"
 					+ GL20.glGetShaderInfoLog(shaderID, 1000));
-
 		}
 		checkForOpenGLError("loadShader");
 		return shaderID;
 	}
 
-	private static FloatBuffer positionsBuffer() {
-		final FloatBuffer positionsBuffer = BufferUtils.createFloatBuffer(positions.size());
-		positionsBuffer.put(positions.toArray());
-		positionsBuffer.flip();
-		return positionsBuffer;
-	}
-
-	private static FloatBuffer normalsBuffer() {
-		final FloatBuffer verticesBuffer = BufferUtils.createFloatBuffer(normals.size());
-		verticesBuffer.put(normals.toArray());
-		verticesBuffer.flip();
-		return verticesBuffer;
-	}
-
-	private static IntBuffer indicesBuffer() {
-		final IntBuffer indicesBuffer = BufferUtils.createIntBuffer(indices.size());
-		indicesBuffer.put(indices.toArray());
-		indicesBuffer.flip();
-		return indicesBuffer;
-	}
-
-	private static Vector3f toCamera(Vector3f v) {
-		return transform(Matrix4f.invert(modelRotationMatrix, null), v);
+	private static Vector3f toCamrera(Vector3f v) {
+		return transform(Matrix4f.invert(cameraRotationMatrix, null), v);
 	}
 
 	private static Vector3f transform(Matrix4f m, Vector3f v) {

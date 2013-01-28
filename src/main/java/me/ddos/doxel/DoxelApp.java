@@ -32,9 +32,14 @@ public class DoxelApp {
 	private static int windowWidth = 1200;
 	private static int windowHeight = 800;
 	private static float fieldOfView = 75;
+	private static float meshResolution = 0.5f;
+	private static Color modelColor;
+	// Model data
+	private static NoiseSource noiseSource;
 	private static final Vector3f modelPosition = new Vector3f();
 	private static final Vector3f modelSize = new Vector3f();
 	// Input
+	private static boolean mouseGrabbed = true;
 	private static final Vector2f cameraRotation = new Vector2f();
 	// Plugin
 	private static String pluginPath;
@@ -54,15 +59,16 @@ public class DoxelApp {
 				plugin.load();
 			}
 			System.out.print("Generating the model mesh from the noise source...");
-			Doxel.generateModelMesh(modelPosition.x, modelPosition.y, modelPosition.z,
-					modelSize.x, modelSize.y, modelSize.z);
+			Model model = MarchingCubesPolygonizer.createModel(noiseSource, meshResolution, modelPosition, modelSize);
 			System.out.println(" done.");
 			Doxel.create(windowTitle, windowWidth, windowHeight, fieldOfView);
-			Doxel.createModel();
+			model.position(modelPosition);
+			model.color(modelColor);
+			model.create();
+			Doxel.addModel(model);
 			Mouse.setGrabbed(true);
 			while (!Display.isCloseRequested()) {
 				processInput();
-				Doxel.doLogic();
 				Doxel.render();
 				Thread.sleep(50);
 			}
@@ -78,6 +84,15 @@ public class DoxelApp {
 			Sys.alert("Error: " + name, message == null || message.trim().equals("") ? name : message);
 			System.exit(-1);
 		}
+	}
+
+	/**
+	 * Sets the noise source used to generate the model mesh.
+	 *
+	 * @param source The source to mesh for visualization.
+	 */
+	public static void noiseSource(NoiseSource source) {
+		noiseSource = source;
 	}
 
 	private static void deploy() throws Exception {
@@ -125,27 +140,27 @@ public class DoxelApp {
 		try {
 			final Map<String, Object> config =
 					(Map<String, Object>) new Yaml().load(new FileInputStream("config.yml"));
-			final Map<String, Object> input = (Map<String, Object>) config.get("Input");
-			final Map<String, Object> appearance = (Map<String, Object>) config.get("Appearance");
-			final Map<String, Object> model = (Map<String, Object>) config.get("Model");
-			final Map<String, Object> noiseSource = (Map<String, Object>) config.get("Plugin");
-			mouseSensitivity = ((Number) input.get("MouseSensitivity")).floatValue();
-			cameraSpeed = ((Number) input.get("CameraSpeed")).floatValue();
-			windowTitle = appearance.get("WindowTitle").toString();
-			final String[] windowSize = ((String) appearance.get("WindowSize")).split(",");
+			final Map<String, Object> inputConfig = (Map<String, Object>) config.get("Input");
+			final Map<String, Object> appearanceConfig = (Map<String, Object>) config.get("Appearance");
+			final Map<String, Object> modelConfig = (Map<String, Object>) config.get("Model");
+			final Map<String, Object> noiseSourceConfig = (Map<String, Object>) config.get("Plugin");
+			mouseSensitivity = ((Number) inputConfig.get("MouseSensitivity")).floatValue();
+			cameraSpeed = ((Number) inputConfig.get("CameraSpeed")).floatValue();
+			windowTitle = appearanceConfig.get("WindowTitle").toString();
+			final String[] windowSize = ((String) appearanceConfig.get("WindowSize")).split(",");
 			windowWidth = Integer.parseInt(windowSize[0].trim());
 			windowHeight = Integer.parseInt(windowSize[1].trim());
-			fieldOfView = ((Number) appearance.get("FieldOfView")).floatValue();
-			Doxel.backgroundColor(parseColor(((String) appearance.get("BackgroundColor")), 0));
-			Doxel.modelColor(parseColor(((String) appearance.get("ModelColor")), 1));
-			Doxel.diffuseIntensity(((Number) appearance.get("DiffuseIntensity")).floatValue());
-			Doxel.specularIntensity(((Number) appearance.get("SpecularIntensity")).floatValue());
-			Doxel.ambientIntensity(((Number) appearance.get("AmbientIntensity")).floatValue());
-			Doxel.lightAttenuation(((Number) appearance.get("LightAttenuation")).floatValue());
-			parseVector(((String) model.get("ModelPosition")), modelPosition);
-			parseVector(((String) model.get("ModelSize")), modelSize);
-			Doxel.meshResolution(((Number) model.get("MeshResolution")).floatValue());
-			pluginPath = noiseSource.get("Path").toString();
+			fieldOfView = ((Number) appearanceConfig.get("FieldOfView")).floatValue();
+			Doxel.backgroundColor(parseColor(((String) appearanceConfig.get("BackgroundColor")), 0));
+			modelColor = (parseColor(((String) appearanceConfig.get("ModelColor")), 1));
+			Doxel.diffuseIntensity(((Number) appearanceConfig.get("DiffuseIntensity")).floatValue());
+			Doxel.specularIntensity(((Number) appearanceConfig.get("SpecularIntensity")).floatValue());
+			Doxel.ambientIntensity(((Number) appearanceConfig.get("AmbientIntensity")).floatValue());
+			Doxel.lightAttenuation(((Number) appearanceConfig.get("LightAttenuation")).floatValue());
+			parseVector(((String) modelConfig.get("ModelPosition")), modelPosition);
+			parseVector(((String) modelConfig.get("ModelSize")), modelSize);
+			meshResolution = (((Number) modelConfig.get("MeshResolution")).floatValue());
+			pluginPath = noiseSourceConfig.get("Path").toString();
 		} catch (Exception ex) {
 			throw new IllegalStateException("Malformed config.yml: \"" + ex.getMessage() + "\".");
 		}
@@ -176,17 +191,30 @@ public class DoxelApp {
 	}
 
 	private static void processInput() {
-		cameraRotation.x += Mouse.getDY() * mouseSensitivity;
-		cameraRotation.y -= Mouse.getDX() * mouseSensitivity;
-		final Quaternion yaw = new Quaternion();
-		yaw.setFromAxisAngle(new Vector4f(1, 0, 0, cameraRotation.x));
-		final Quaternion pitch = new Quaternion();
-		pitch.setFromAxisAngle(new Vector4f(0, 1, 0, cameraRotation.y));
-		Quaternion.mul(pitch, yaw, Doxel.modelRotation());
+		final boolean mouseGrabbedBefore = mouseGrabbed;
+		while (Keyboard.next()) {
+			if (Keyboard.getEventKeyState()) {
+				if (Keyboard.getEventKey() == Keyboard.KEY_ESCAPE) {
+					mouseGrabbed ^= true;
+				}
+			}
+		}
+		if (mouseGrabbed != mouseGrabbedBefore) {
+			Mouse.setGrabbed(mouseGrabbed);
+		}
+		if (mouseGrabbed) {
+			cameraRotation.x += Mouse.getDY() * mouseSensitivity;
+			cameraRotation.y -= Mouse.getDX() * mouseSensitivity;
+			final Quaternion yaw = new Quaternion();
+			yaw.setFromAxisAngle(new Vector4f(1, 0, 0, cameraRotation.x));
+			final Quaternion pitch = new Quaternion();
+			pitch.setFromAxisAngle(new Vector4f(0, 1, 0, cameraRotation.y));
+			Quaternion.mul(pitch, yaw, Doxel.cameraRotation());
+		}
 		final Vector3f right = Doxel.cameraRight();
 		final Vector3f up = Doxel.cameraUp();
 		final Vector3f forward = Doxel.cameraForward();
-		final Vector3f position = Doxel.modelPosition();
+		final Vector3f position = Doxel.cameraPosition();
 		if (Keyboard.isKeyDown(Keyboard.KEY_W)) {
 			Vector3f.add(position, scale(forward, cameraSpeed), position);
 		}
