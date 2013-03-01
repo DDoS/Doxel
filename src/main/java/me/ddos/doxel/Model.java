@@ -17,6 +17,9 @@ import org.lwjgl.util.vector.Quaternion;
 import org.lwjgl.util.vector.Vector3f;
 
 /**
+ * An OpenGL rendering model. Used by {@link Doxel}. Can be translated and rotated independently.
+ * The model must first be meshed by adding data to the positions, normals and indices list. It can
+ * then be created using {@link #create()}. Then the model can be rendered by adding it to {@link Doxel}.
  *
  * @author DDoS
  */

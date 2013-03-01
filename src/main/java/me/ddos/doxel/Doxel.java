@@ -26,10 +26,8 @@ import org.lwjgl.util.vector.Vector4f;
 
 /**
  * Doxel is a simple rendering engine used for rendering scalar data on an aligned grid. This is can
- * be used to render such things as coherent noise. To polygonize the scalar data, the marching
- * cubes algorithm is used by default, but other polygonizers can be used as long as they implement {@link Polygonizer}.
- * Noise sources must implement {@link NoiseSource} to be used. See the source of {@link DoxelApp}
- * (available on GitHub) for an example on how to use this class. <p> Doxel requires OpenGL 3.2.
+ * be used to render such things as coherent noise. See the source of {@link DoxelApp} (available on
+ * GitHub) for an example on how to use this class. <p> Doxel requires OpenGL 3.2.
  *
  * @author DDoS
  */

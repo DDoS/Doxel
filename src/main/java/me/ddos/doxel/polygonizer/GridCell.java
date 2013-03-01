@@ -1,4 +1,4 @@
-package me.ddos.doxel;
+package me.ddos.doxel.polygonizer;
 
 import org.lwjgl.util.vector.Vector3f;
 

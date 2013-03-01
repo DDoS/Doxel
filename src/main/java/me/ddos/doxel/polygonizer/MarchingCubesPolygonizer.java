@@ -1,4 +1,4 @@
-package me.ddos.doxel;
+package me.ddos.doxel.polygonizer;
 
 import gnu.trove.list.TFloatList;
 import gnu.trove.list.TIntList;
@@ -10,7 +10,7 @@ import org.lwjgl.util.vector.Vector3f;
  *
  * @author DDoS
  */
-public class MarchingCubesPolygonizer implements Polygonizer {
+public class MarchingCubesPolygonizer extends Polygonizer {
 	private static final short[] EDGE_TABLE = {
 		0x0, 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
 		0x80c, 0x905, 0xa0f, 0xb06, 0xc0a, 0xd03, 0xe09, 0xf00,
@@ -303,7 +303,6 @@ public class MarchingCubesPolygonizer implements Polygonizer {
 		{0, 3, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
 		{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}
 	};
-	private static final Polygonizer MARCHING_CUBES = new MarchingCubesPolygonizer();
 	private double threshold = 0;
 
 	@Override
@@ -447,57 +446,5 @@ public class MarchingCubesPolygonizer implements Polygonizer {
 		}
 		float mu = (float) ((threshold - valp1) / (valp2 - valp1));
 		return new Vector3f(p1.x + mu * (p2.x - p1.x), p1.y + mu * (p2.y - p1.y), p1.z + mu * (p2.z - p1.z));
-	}
-
-	/**
-	 * Generates the model's mesh from the noise source using the provided polygonizer. Default
-	 * noise source is a {@link SimplePerlinNoiseSource} with a frequeny of 0.05. Default
-	 * polygonizer is the {@link MarchingCubesPolygonizer}.
-	 *
-	 * @param x The x coordinate of the position of the model.
-	 * @param y The y coordinate of the position of the model.
-	 * @param z The z coordinate of the position of the model.
-	 * @param sizeX The size on the x axis of the model.
-	 * @param sizeY The size on the y axis of the model.
-	 * @param sizeZ The size on the z axis of the model.
-	 */
-	public static Model createModel(NoiseSource noise, float meshResolution,
-			Vector3f position, Vector3f size) {
-		if (noise == null) {
-			throw new IllegalArgumentException("Noise source must be defined first.");
-		}
-		final Model model = new Model();
-		int index = 0;
-		final GridCell cell = new GridCell();
-		final float x = position.x;
-		final float y = position.y;
-		final float z = position.z;
-		final float sizeX = size.x;
-		final float sizeY = size.y;
-		final float sizeZ = size.z;
-		for (float xx = x; xx < x + sizeX; xx += meshResolution) {
-			for (float yy = y; yy < y + sizeY; yy += meshResolution) {
-				for (float zz = z; zz < z + sizeZ; zz += meshResolution) {
-					cell.p0.set(xx, yy, zz);
-					cell.p1.set(xx + meshResolution, yy, zz);
-					cell.p2.set(xx + meshResolution, yy, zz + meshResolution);
-					cell.p3.set(xx, yy, zz + meshResolution);
-					cell.p4.set(xx, yy + meshResolution, zz);
-					cell.p5.set(xx + meshResolution, yy + meshResolution, zz);
-					cell.p6.set(xx + meshResolution, yy + meshResolution, zz + meshResolution);
-					cell.p7.set(xx, yy + meshResolution, zz + meshResolution);
-					cell.v0 = noise.noise(xx, yy, zz);
-					cell.v1 = noise.noise(xx + meshResolution, yy, zz);
-					cell.v2 = noise.noise(xx + meshResolution, yy, zz + meshResolution);
-					cell.v3 = noise.noise(xx, yy, zz + meshResolution);
-					cell.v4 = noise.noise(xx, yy + meshResolution, zz);
-					cell.v5 = noise.noise(xx + meshResolution, yy + meshResolution, zz);
-					cell.v6 = noise.noise(xx + meshResolution, yy + meshResolution, zz + meshResolution);
-					cell.v7 = noise.noise(xx, yy + meshResolution, zz + meshResolution);
-					index = MARCHING_CUBES.polygonize(cell, model.positions(), model.normals(), model.indices(), index);
-				}
-			}
-		}
-		return model;
 	}
 }

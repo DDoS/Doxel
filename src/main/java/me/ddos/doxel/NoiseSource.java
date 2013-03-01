@@ -1,7 +1,7 @@
 package me.ddos.doxel;
 
 /**
- * A source of scalar noise values located in 3D space.
+ * A source of real scalar noise values located in 3D space.
  *
  * @author DDoS
  */

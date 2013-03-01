@@ -7,6 +7,8 @@ import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Map;
+import me.ddos.doxel.polygonizer.MarchingCubesPolygonizer;
+import me.ddos.doxel.polygonizer.Polygonizer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.lwjgl.Sys;
@@ -36,6 +38,7 @@ public class DoxelApp {
 	private static Color modelColor;
 	// Model data
 	private static NoiseSource noiseSource;
+	private static Polygonizer polygonizer = new MarchingCubesPolygonizer();
 	private static final Vector3f modelPosition = new Vector3f();
 	private static final Vector3f modelSize = new Vector3f();
 	// Input
@@ -59,7 +62,7 @@ public class DoxelApp {
 				plugin.load();
 			}
 			System.out.print("Generating the model mesh from the noise source...");
-			Model model = MarchingCubesPolygonizer.createModel(noiseSource, meshResolution, modelPosition, modelSize);
+			Model model = polygonizer.createModel(noiseSource, meshResolution, modelPosition, modelSize);
 			System.out.println(" done.");
 			Doxel.create(windowTitle, windowWidth, windowHeight, fieldOfView);
 			model.position(modelPosition);
@@ -68,9 +71,10 @@ public class DoxelApp {
 			Doxel.addModel(model);
 			Mouse.setGrabbed(true);
 			while (!Display.isCloseRequested()) {
+				final long start = System.nanoTime();
 				processInput();
 				Doxel.render();
-				Thread.sleep(50);
+				Thread.sleep(Math.max(50 - (long) Math.round((System.nanoTime() - start) / 1000000d), 0));
 			}
 			if (plugin != null) {
 				plugin.unload();
@@ -93,6 +97,15 @@ public class DoxelApp {
 	 */
 	public static void noiseSource(NoiseSource source) {
 		noiseSource = source;
+	}
+
+	/**
+	 * Sets the polygonizer to use.
+	 *
+	 * @param polygonizer The polygonizer to use.
+	 */
+	public static void polygonizer(Polygonizer polygonizer) {
+		DoxelApp.polygonizer = polygonizer;
 	}
 
 	private static void deploy() throws Exception {
@@ -130,9 +143,9 @@ public class DoxelApp {
 				FileUtils.copyInputStreamToFile(DoxelApp.class.getResourceAsStream("/" + nativeLib), nativeFile);
 			}
 		}
-		final String nativePath = nativesDir.getAbsolutePath();
-		System.setProperty("org.lwjgl.librarypath", nativePath);
-		System.setProperty("net.java.games.input.librarypath", nativePath);
+		final String nativesPath = nativesDir.getAbsolutePath();
+		System.setProperty("org.lwjgl.librarypath", nativesPath);
+		System.setProperty("net.java.games.input.librarypath", nativesPath);
 	}
 
 	@SuppressWarnings("unchecked")
