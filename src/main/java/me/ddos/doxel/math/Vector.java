@@ -191,6 +191,15 @@ public class Vector implements Comparable<Vector>, Serializable, Cloneable {
 		return d;
 	}
 
+	public Vector negate() {
+		final int size = size();
+		final Vector d = new Vector(size);
+		for (int comp = 0; comp < size; comp++) {
+			d.vec[comp] = -vec[comp];
+		}
+		return d;
+	}
+
 	public Vector min(Vector v) {
 		return min(v.vec);
 	}

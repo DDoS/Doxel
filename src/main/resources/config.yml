@@ -1,6 +1,6 @@
 Input:
     # Sensitivity of the mouse for looking around.
-    MouseSensitivity: 0.01
+    MouseSensitivity: 0.1
     # Speed of the camera for moving about.
     CameraSpeed: 0.4
 Appearance:
@@ -21,7 +21,7 @@ Appearance:
     # Ambient light intensity in each floats RGB component.
     AmbientIntensity: 0.1
     # How much distance affects light intensity.
-    LightAttenuation: 0.9
+    LightAttenuation: 0.2
 Model:
     # Position of the model in floats.
     ModelPosition: -15, -15, -15

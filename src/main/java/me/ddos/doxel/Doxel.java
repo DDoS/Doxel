@@ -8,6 +8,9 @@ import java.io.InputStreamReader;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import me.ddos.doxel.math.Matrix;
+import me.ddos.doxel.math.Quaternion;
+import me.ddos.doxel.math.Vector3;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.opengl.ContextAttribs;
@@ -19,10 +22,6 @@ import org.lwjgl.opengl.GL32;
 import org.lwjgl.opengl.OpenGLException;
 import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.util.glu.GLU;
-import org.lwjgl.util.vector.Matrix4f;
-import org.lwjgl.util.vector.Quaternion;
-import org.lwjgl.util.vector.Vector3f;
-import org.lwjgl.util.vector.Vector4f;
 
 /**
  * Doxel is a simple rendering engine used for rendering scalar data on an aligned grid. This is can
@@ -53,15 +52,14 @@ public class Doxel {
 	private static int lightPositionLocation;
 	private static int lightAttenuationLocation;
 	// Camera
-	private static final Matrix4f projectionMatrix = new Matrix4f();
-	private static Vector3f cameraPosition = new Vector3f(0, 0, 0);
+	private static final Matrix projectionMatrix = new Matrix(4);
+	private static Vector3 cameraPosition = new Vector3(0, 0, 0);
 	private static Quaternion cameraRotation = new Quaternion();
-	private static final Matrix4f cameraRotationMatrix = new Matrix4f();
-	private static final Matrix4f cameraPositionMatrix = new Matrix4f();
-	private static final Matrix4f cameraMatrix = new Matrix4f();
+	private static Matrix cameraRotationMatrix = new Matrix(4);
+	private static Matrix cameraMatrix = new Matrix(4);
 	private static boolean updateCameraMatrix = true;
 	// Lighting
-	private static Vector3f lightPosition = new Vector3f(0, 0, 0);
+	private static Vector3 lightPosition = new Vector3(0, 0, 0);
 	private static float diffuseIntensity = 0.9f;
 	private static float specularIntensity = 1;
 	private static float ambientIntensity = 0.1f;
@@ -127,11 +125,11 @@ public class Doxel {
 		final float y_scale = (float) (1 / Math.tan(Math.toRadians(fieldOfView / 2)));
 		final float x_scale = y_scale / aspectRatio;
 		final float frustum_length = far_plane - near_plane;
-		projectionMatrix.m00 = x_scale;
-		projectionMatrix.m11 = y_scale;
-		projectionMatrix.m22 = -((far_plane + near_plane) / frustum_length);
-		projectionMatrix.m23 = -1;
-		projectionMatrix.m32 = -((2 * near_plane * far_plane) / frustum_length);
+		projectionMatrix.set(0, 0, x_scale);
+		projectionMatrix.set(1, 1, y_scale);
+		projectionMatrix.set(2, 2, -(far_plane + near_plane) / frustum_length);
+		projectionMatrix.set(2, 3, -1);
+		projectionMatrix.set(3, 2, -(2 * near_plane * far_plane) / frustum_length);
 	}
 
 	private static void createShaders() {
@@ -181,24 +179,11 @@ public class Doxel {
 		models.clear();
 	}
 
-	private static Matrix4f cameraMatrix() {
+	private static Matrix cameraMatrix() {
 		if (updateCameraMatrix) {
-			cameraRotationMatrix.setIdentity();
-			cameraRotationMatrix.m00 = 1 - 2 * cameraRotation.y * cameraRotation.y - 2 * cameraRotation.z * cameraRotation.z;
-			cameraRotationMatrix.m01 = 2 * cameraRotation.x * cameraRotation.y - 2 * cameraRotation.w * cameraRotation.z;
-			cameraRotationMatrix.m02 = 2 * cameraRotation.x * cameraRotation.z + 2 * cameraRotation.w * cameraRotation.y;
-			cameraRotationMatrix.m03 = 0;
-			cameraRotationMatrix.m10 = 2 * cameraRotation.x * cameraRotation.y + 2 * cameraRotation.w * cameraRotation.z;
-			cameraRotationMatrix.m11 = 1 - 2 * cameraRotation.x * cameraRotation.x - 2 * cameraRotation.z * cameraRotation.z;
-			cameraRotationMatrix.m12 = 2 * cameraRotation.y * cameraRotation.z - 2 * cameraRotation.w * cameraRotation.x;
-			cameraRotationMatrix.m13 = 0;
-			cameraRotationMatrix.m20 = 2 * cameraRotation.x * cameraRotation.z - 2 * cameraRotation.w * cameraRotation.y;
-			cameraRotationMatrix.m21 = 2 * cameraRotation.y * cameraRotation.z + 2.f * cameraRotation.x * cameraRotation.w;
-			cameraRotationMatrix.m22 = 1 - 2 * cameraRotation.x * cameraRotation.x - 2 * cameraRotation.y * cameraRotation.y;
-			cameraRotationMatrix.m23 = 0;
-			cameraPositionMatrix.setIdentity();
-			Matrix4f.translate(cameraPosition, cameraPositionMatrix, cameraPositionMatrix);
-			Matrix4f.mul(cameraRotationMatrix, cameraPositionMatrix, cameraMatrix);
+			cameraRotationMatrix = new Matrix(4, cameraRotation);
+			final Matrix cameraPositionMatrix = new Matrix(4, true, cameraPosition);
+			cameraMatrix = cameraRotationMatrix.mul(cameraPositionMatrix);
 			updateCameraMatrix = false;
 		}
 		return cameraMatrix;
@@ -206,26 +191,26 @@ public class Doxel {
 
 	private static void shaderData() {
 		final FloatBuffer matrixBuffer = BufferUtils.createFloatBuffer(16);
-		cameraMatrix().store(matrixBuffer);
+		matrixBuffer.put(cameraMatrix().toArray());
 		matrixBuffer.flip();
 		GL20.glUniformMatrix4(cameraMatrixLocation, false, matrixBuffer);
 		matrixBuffer.clear();
-		projectionMatrix.store(matrixBuffer);
+		matrixBuffer.put(projectionMatrix.toArray());
 		matrixBuffer.flip();
 		GL20.glUniformMatrix4(projectionMatrixLocation, false, matrixBuffer);
 		GL20.glUniform1f(diffuseIntensityLocation, diffuseIntensity);
 		GL20.glUniform1f(specularIntensityLocation, specularIntensity);
 		GL20.glUniform1f(ambientIntensityLocation, ambientIntensity);
-		GL20.glUniform3f(lightPositionLocation, lightPosition.x, lightPosition.y, lightPosition.z);
+		GL20.glUniform3f(lightPositionLocation, lightPosition.getX(), lightPosition.getY(), lightPosition.getZ());
 		GL20.glUniform1f(lightAttenuationLocation, lightAttenuation);
 		checkForOpenGLError("preRender");
 	}
 
 	private static void shaderData(Model model) {
-		final FloatBuffer matrix44Buffer = BufferUtils.createFloatBuffer(16);
-		model.matrix().store(matrix44Buffer);
-		matrix44Buffer.flip();
-		GL20.glUniformMatrix4(modelMatrixLocation, false, matrix44Buffer);
+		final FloatBuffer matrixBuffer = BufferUtils.createFloatBuffer(16);
+		matrixBuffer.put(model.matrix().toArray());
+		matrixBuffer.flip();
+		GL20.glUniformMatrix4(modelMatrixLocation, false, matrixBuffer);
 		GL20.glUniform4f(modelColorLocation,
 				model.color().getRed() / 255f, model.color().getGreen() / 255f,
 				model.color().getBlue() / 255f, model.color().getAlpha() / 255f);
@@ -295,7 +280,7 @@ public class Doxel {
 	 *
 	 * @return The camera position.
 	 */
-	public static Vector3f cameraPosition() {
+	public static Vector3 cameraPosition() {
 		updateCameraMatrix = true;
 		return cameraPosition;
 	}
@@ -305,7 +290,7 @@ public class Doxel {
 	 *
 	 * @param position The camera position.
 	 */
-	public static void cameraPosition(Vector3f position) {
+	public static void cameraPosition(Vector3 position) {
 		cameraPosition = position;
 		updateCameraMatrix = true;
 	}
@@ -335,8 +320,8 @@ public class Doxel {
 	 *
 	 * @return The camera's right direction vector.
 	 */
-	public static Vector3f cameraRight() {
-		return toCamrera(new Vector3f(1, 0, 0));
+	public static Vector3 cameraRight() {
+		return toCamrera(new Vector3(1, 0, 0));
 	}
 
 	/**
@@ -344,8 +329,8 @@ public class Doxel {
 	 *
 	 * @return The camera's up direction vector.
 	 */
-	public static Vector3f cameraUp() {
-		return toCamrera(new Vector3f(0, 1, 0));
+	public static Vector3 cameraUp() {
+		return toCamrera(new Vector3(0, 1, 0));
 	}
 
 	/**
@@ -353,8 +338,8 @@ public class Doxel {
 	 *
 	 * @return The camera's forward direction vector.
 	 */
-	public static Vector3f cameraForward() {
-		return toCamrera(new Vector3f(0, 0, 1));
+	public static Vector3 cameraForward() {
+		return toCamrera(new Vector3(0, 0, 1));
 	}
 
 	/**
@@ -380,7 +365,7 @@ public class Doxel {
 	 *
 	 * @return The light position.
 	 */
-	public static Vector3f lightPosition() {
+	public static Vector3 lightPosition() {
 		return lightPosition;
 	}
 
@@ -389,7 +374,7 @@ public class Doxel {
 	 *
 	 * @param position The light position.
 	 */
-	public static void lightPosition(Vector3f position) {
+	public static void lightPosition(Vector3 position) {
 		lightPosition = position;
 	}
 
@@ -504,14 +489,11 @@ public class Doxel {
 		return shaderID;
 	}
 
-	private static Vector3f toCamrera(Vector3f v) {
-		return transform(Matrix4f.invert(cameraRotationMatrix, null), v);
-	}
-
-	private static Vector3f transform(Matrix4f m, Vector3f v) {
-		final Vector4f v4 = new Vector4f(v.x, v.y, v.z, 1);
-		Matrix4f.transform(m, v4, v4);
-		v.set(v4.x, v4.y, v4.z);
+	private static Vector3 toCamrera(Vector3 v) {
+		final Matrix inverted = cameraRotationMatrix.invert();
+		if (inverted != null) {
+			return inverted.transform(v);
+		}
 		return v;
 	}
 }

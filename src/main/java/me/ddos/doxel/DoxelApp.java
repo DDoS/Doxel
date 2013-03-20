@@ -7,6 +7,8 @@ import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Map;
+import me.ddos.doxel.math.Quaternion;
+import me.ddos.doxel.math.Vector3;
 import me.ddos.doxel.polygonizer.MarchingCubesPolygonizer;
 import me.ddos.doxel.polygonizer.Polygonizer;
 import org.apache.commons.io.FileUtils;
@@ -15,10 +17,6 @@ import org.lwjgl.Sys;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
-import org.lwjgl.util.vector.Quaternion;
-import org.lwjgl.util.vector.Vector2f;
-import org.lwjgl.util.vector.Vector3f;
-import org.lwjgl.util.vector.Vector4f;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -28,7 +26,7 @@ import org.yaml.snakeyaml.Yaml;
  */
 public class DoxelApp {
 	// Settings
-	private static float mouseSensitivity = 0.01f;
+	private static float mouseSensitivity = 0.1f;
 	private static float cameraSpeed = 0.4f;
 	private static String windowTitle = "Doxel";
 	private static int windowWidth = 1200;
@@ -39,11 +37,12 @@ public class DoxelApp {
 	// Model data
 	private static NoiseSource noiseSource;
 	private static Polygonizer polygonizer = new MarchingCubesPolygonizer();
-	private static final Vector3f modelPosition = new Vector3f();
-	private static final Vector3f modelSize = new Vector3f();
+	private static Vector3 modelPosition = new Vector3();
+	private static Vector3 modelSize = new Vector3();
 	// Input
 	private static boolean mouseGrabbed = true;
-	private static final Vector2f cameraRotation = new Vector2f();
+	private static float cameraPitch = 0;
+	private static float cameraYaw = 0;
 	// Plugin
 	private static String pluginPath;
 	private static DoxelPlugin plugin;
@@ -170,8 +169,8 @@ public class DoxelApp {
 			Doxel.specularIntensity(((Number) appearanceConfig.get("SpecularIntensity")).floatValue());
 			Doxel.ambientIntensity(((Number) appearanceConfig.get("AmbientIntensity")).floatValue());
 			Doxel.lightAttenuation(((Number) appearanceConfig.get("LightAttenuation")).floatValue());
-			parseVector(((String) modelConfig.get("ModelPosition")), modelPosition);
-			parseVector(((String) modelConfig.get("ModelSize")), modelSize);
+			modelPosition = parseVector3(((String) modelConfig.get("ModelPosition")));
+			modelSize = parseVector3(((String) modelConfig.get("ModelSize")));
 			meshResolution = (((Number) modelConfig.get("MeshResolution")).floatValue());
 			pluginPath = noiseSourceConfig.get("Path").toString();
 		} catch (Exception ex) {
@@ -216,41 +215,36 @@ public class DoxelApp {
 			Mouse.setGrabbed(mouseGrabbed);
 		}
 		if (mouseGrabbed) {
-			cameraRotation.x += Mouse.getDY() * mouseSensitivity;
-			cameraRotation.y -= Mouse.getDX() * mouseSensitivity;
-			final Quaternion yaw = new Quaternion();
-			yaw.setFromAxisAngle(new Vector4f(1, 0, 0, cameraRotation.x));
-			final Quaternion pitch = new Quaternion();
-			pitch.setFromAxisAngle(new Vector4f(0, 1, 0, cameraRotation.y));
-			Quaternion.mul(pitch, yaw, Doxel.cameraRotation());
+			cameraYaw += Mouse.getDY() * mouseSensitivity;
+			cameraPitch -= Mouse.getDX() * mouseSensitivity;
+			final Quaternion yaw = new Quaternion(cameraYaw, 1, 0, 0);
+			final Quaternion pitch = new Quaternion(cameraPitch, 0, 1, 0);
+			Doxel.cameraRotation(pitch.mul(yaw));
 		}
-		final Vector3f right = Doxel.cameraRight();
-		final Vector3f up = Doxel.cameraUp();
-		final Vector3f forward = Doxel.cameraForward();
-		final Vector3f position = Doxel.cameraPosition();
+		final Vector3 right = Doxel.cameraRight();
+		final Vector3 up = Doxel.cameraUp();
+		final Vector3 forward = Doxel.cameraForward();
+		Vector3 position = Doxel.cameraPosition();
 		if (Keyboard.isKeyDown(Keyboard.KEY_W)) {
-			Vector3f.add(position, scale(forward, cameraSpeed), position);
+			position = position.add(forward.scale(cameraSpeed));
 		}
 		if (Keyboard.isKeyDown(Keyboard.KEY_S)) {
-			Vector3f.add(position, scale(forward, -cameraSpeed), position);
+			position = position.add(forward.scale(-cameraSpeed));
 		}
 		if (Keyboard.isKeyDown(Keyboard.KEY_A)) {
-			Vector3f.add(position, scale(right, cameraSpeed), position);
+			position = position.add(right.scale(cameraSpeed));
 		}
 		if (Keyboard.isKeyDown(Keyboard.KEY_D)) {
-			Vector3f.add(position, scale(right, -cameraSpeed), position);
+			position = position.add(right.scale(-cameraSpeed));
 		}
 		if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)) {
-			Vector3f.add(position, scale(up, cameraSpeed), position);
+			position = position.add(up.scale(cameraSpeed));
 		}
 		if (Keyboard.isKeyDown(Keyboard.KEY_SPACE)) {
-			Vector3f.add(position, scale(up, -cameraSpeed), position);
+			position = position.add(up.scale(-cameraSpeed));
 		}
-		Doxel.lightPosition(position.negate(null));
-	}
-
-	private static Vector3f scale(Vector3f v, float s) {
-		return new Vector3f(v.x * s, v.y * s, v.z * s);
+		Doxel.cameraPosition(position);
+		Doxel.lightPosition(position.negate());
 	}
 
 	private static Color parseColor(String s, float alpha) {
@@ -262,9 +256,9 @@ public class DoxelApp {
 				alpha);
 	}
 
-	private static void parseVector(String s, Vector3f v) {
+	private static Vector3 parseVector3(String s) {
 		final String[] ss = s.split(",");
-		v.set(
+		return new Vector3(
 				Float.parseFloat(ss[0].trim()),
 				Float.parseFloat(ss[1].trim()),
 				Float.parseFloat(ss[2].trim()));

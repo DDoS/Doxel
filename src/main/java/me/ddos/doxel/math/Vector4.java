@@ -168,6 +168,10 @@ public class Vector4 implements Comparable<Vector4>, Serializable, Cloneable {
 		return new Vector4(Math.abs(x), Math.abs(y), Math.abs(z), Math.abs(w));
 	}
 
+	public Vector4 negate() {
+		return new Vector4(-x, -y, -z, -w);
+	}
+
 	public Vector4 min(Vector4 v) {
 		return min(v.x, v.y, v.z, v.w);
 	}

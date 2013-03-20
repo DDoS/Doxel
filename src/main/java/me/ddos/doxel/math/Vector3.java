@@ -169,6 +169,10 @@ public class Vector3 implements Comparable<Vector3>, Serializable, Cloneable {
 		return new Vector3(Math.abs(x), Math.abs(y), Math.abs(z));
 	}
 
+	public Vector3 negate() {
+		return new Vector3(-x, -y, -z);
+	}
+
 	public Vector3 min(Vector3 v) {
 		return min(v.x, v.y, v.z);
 	}

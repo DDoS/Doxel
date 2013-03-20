@@ -74,10 +74,10 @@ public class Matrix implements Serializable, Cloneable {
 	}
 
 	public Matrix(int size, Complex rot) {
+		this(size);
 		if (size < 2) {
 			throw new IllegalArgumentException("Minimum matrix size is 2");
 		}
-		mat = new float[size][size];
 		rot = rot.normalize();
 		mat[0][0] = rot.getX();
 		mat[0][1] = -rot.getY();
@@ -86,10 +86,10 @@ public class Matrix implements Serializable, Cloneable {
 	}
 
 	public Matrix(int size, Quaternion rot) {
+		this(size);
 		if (size < 3) {
 			throw new IllegalArgumentException("Minimum matrix size is 3");
 		}
-		mat = new float[size][size];
 		rot = rot.normalize();
 		mat[0][0] = 1 - 2 * rot.getY() * rot.getY() - 2 * rot.getZ() * rot.getZ();
 		mat[0][1] = 2 * rot.getX() * rot.getY() - 2 * rot.getW() * rot.getZ();
@@ -434,13 +434,6 @@ public class Matrix implements Serializable, Cloneable {
 			System.arraycopy(mat[col], 0, array, col * size, size);
 		}
 		return array;
-	}
-
-	public void set(float[] array) {
-		final int size = size();
-		for (int col = 0; col < size; col++) {
-			System.arraycopy(array, col * size, mat[col], 0, size);
-		}
 	}
 
 	@Override

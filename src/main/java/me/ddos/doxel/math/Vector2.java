@@ -146,6 +146,10 @@ public class Vector2 implements Comparable<Vector2>, Serializable, Cloneable {
 		return new Vector2(Math.abs(x), Math.abs(y));
 	}
 
+	public Vector2 negate() {
+		return new Vector2(-x, -y);
+	}
+
 	public Vector2 min(Vector2 v) {
 		return min(v.x, v.y);
 	}

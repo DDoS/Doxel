@@ -4,7 +4,7 @@ import gnu.trove.list.TFloatList;
 import gnu.trove.list.TIntList;
 import me.ddos.doxel.Model;
 import me.ddos.doxel.NoiseSource;
-import org.lwjgl.util.vector.Vector3f;
+import me.ddos.doxel.math.Vector3;
 
 /**
  * Generates a triangle mesh from grid cells.
@@ -23,19 +23,19 @@ public abstract class Polygonizer {
 	 * @return The meshed but uncreated model.
 	 */
 	public Model createModel(NoiseSource noise, float meshResolution,
-			Vector3f position, Vector3f size) {
+			Vector3 position, Vector3 size) {
 		if (noise == null) {
 			throw new IllegalArgumentException("Noise source must be defined first.");
 		}
 		final Model model = new Model();
 		int index = 0;
 		final GridCell cell = new GridCell();
-		final float x = position.x;
-		final float y = position.y;
-		final float z = position.z;
-		final float sizeX = size.x;
-		final float sizeY = size.y;
-		final float sizeZ = size.z;
+		final float x = position.getX();
+		final float y = position.getY();
+		final float z = position.getZ();
+		final float sizeX = size.getX();
+		final float sizeY = size.getY();
+		final float sizeZ = size.getZ();
 		for (float xx = x; xx < x + sizeX; xx += meshResolution) {
 			for (float yy = y; yy < y + sizeY; yy += meshResolution) {
 				for (float zz = z; zz < z + sizeZ; zz += meshResolution) {

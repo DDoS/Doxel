@@ -7,14 +7,14 @@ import gnu.trove.list.array.TIntArrayList;
 import java.awt.Color;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import me.ddos.doxel.math.Matrix;
+import me.ddos.doxel.math.Quaternion;
+import me.ddos.doxel.math.Vector3;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
-import org.lwjgl.util.vector.Matrix4f;
-import org.lwjgl.util.vector.Quaternion;
-import org.lwjgl.util.vector.Vector3f;
 
 /**
  * An OpenGL rendering model. Used by {@link Doxel}. Can be translated and rotated independently.
@@ -40,11 +40,9 @@ public class Model {
 	private int normalsBufferID = 0;
 	private int vertexIndexBufferID = 0;
 	// Properties
-	private Vector3f position = new Vector3f(0, 0, 0);
+	private Vector3 position = new Vector3(0, 0, 0);
 	private Quaternion rotation = new Quaternion();
-	private final Matrix4f rotationMatrix = new Matrix4f();
-	private final Matrix4f positionMatrix = new Matrix4f();
-	private final Matrix4f matrix = new Matrix4f();
+	private Matrix matrix = new Matrix(4);
 	private boolean updateMatrix = true;
 	private Color modelColor = new Color(1, 0.1f, 0.1f, 1);
 
@@ -123,24 +121,11 @@ public class Model {
 	 *
 	 * @return The model matrix.
 	 */
-	protected Matrix4f matrix() {
+	protected Matrix matrix() {
 		if (updateMatrix) {
-			rotationMatrix.setIdentity();
-			rotationMatrix.m00 = 1 - 2 * rotation.y * rotation.y - 2 * rotation.z * rotation.z;
-			rotationMatrix.m01 = 2 * rotation.x * rotation.y - 2 * rotation.w * rotation.z;
-			rotationMatrix.m02 = 2 * rotation.x * rotation.z + 2 * rotation.w * rotation.y;
-			rotationMatrix.m03 = 0;
-			rotationMatrix.m10 = 2 * rotation.x * rotation.y + 2 * rotation.w * rotation.z;
-			rotationMatrix.m11 = 1 - 2 * rotation.x * rotation.x - 2 * rotation.z * rotation.z;
-			rotationMatrix.m12 = 2 * rotation.y * rotation.z - 2 * rotation.w * rotation.x;
-			rotationMatrix.m13 = 0;
-			rotationMatrix.m20 = 2 * rotation.x * rotation.z - 2 * rotation.w * rotation.y;
-			rotationMatrix.m21 = 2 * rotation.y * rotation.z + 2.f * rotation.x * rotation.w;
-			rotationMatrix.m22 = 1 - 2 * rotation.x * rotation.x - 2 * rotation.y * rotation.y;
-			rotationMatrix.m23 = 0;
-			positionMatrix.setIdentity();
-			Matrix4f.translate(position, positionMatrix, positionMatrix);
-			Matrix4f.mul(rotationMatrix, positionMatrix, matrix);
+			final Matrix rotationMatrix = new Matrix(4, rotation);
+			final Matrix positionMatrix = new Matrix(4, true, position);
+			matrix = rotationMatrix.mul(positionMatrix);
 			updateMatrix = false;
 		}
 		return matrix;
@@ -223,7 +208,7 @@ public class Model {
 	 *
 	 * @return The model position.
 	 */
-	public Vector3f position() {
+	public Vector3 position() {
 		updateMatrix = true;
 		return position;
 	}
@@ -233,7 +218,7 @@ public class Model {
 	 *
 	 * @param position The model position.
 	 */
-	public void position(Vector3f position) {
+	public void position(Vector3 position) {
 		this.position = position;
 		updateMatrix = true;
 	}
