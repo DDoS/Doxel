@@ -181,8 +181,8 @@ public class Doxel {
 
 	private static Matrix cameraMatrix() {
 		if (updateCameraMatrix) {
-			cameraRotationMatrix = new Matrix(4, cameraRotation);
-			final Matrix cameraPositionMatrix = new Matrix(4, true, cameraPosition);
+			cameraRotationMatrix = Matrix.createRotation(4, cameraRotation);
+			final Matrix cameraPositionMatrix = Matrix.createTranslation(4, cameraPosition);
 			cameraMatrix = cameraRotationMatrix.mul(cameraPositionMatrix);
 			updateCameraMatrix = false;
 		}

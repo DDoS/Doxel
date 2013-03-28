@@ -123,8 +123,8 @@ public class Model {
 	 */
 	protected Matrix matrix() {
 		if (updateMatrix) {
-			final Matrix rotationMatrix = new Matrix(4, rotation);
-			final Matrix positionMatrix = new Matrix(4, true, position);
+			final Matrix rotationMatrix = Matrix.createRotation(4, rotation);
+			final Matrix positionMatrix = Matrix.createTranslation(4, position);
 			matrix = rotationMatrix.mul(positionMatrix);
 			updateMatrix = false;
 		}

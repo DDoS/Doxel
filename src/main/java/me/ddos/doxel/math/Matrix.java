@@ -29,79 +29,6 @@ public class Matrix implements Serializable, Cloneable {
 		mat = deepClone(m.mat);
 	}
 
-	public Matrix(int size, double scale) {
-		this(size, (float) scale);
-	}
-
-	public Matrix(int size, float scale) {
-		this(size, false, adjustSize(new float[0], size, scale));
-	}
-
-	public Matrix(int size, boolean translate, Vector2 v) {
-		this(size, translate, v.getX(), v.getY());
-	}
-
-	public Matrix(int size, boolean translate, Vector3 v) {
-		this(size, translate, v.getX(), v.getY(), v.getZ());
-	}
-
-	public Matrix(int size, boolean translate, Vector4 v) {
-		this(size, translate, v.getX(), v.getY(), v.getZ(), v.getW());
-	}
-
-	public Matrix(int size, boolean translate, Vector v) {
-		this(size, translate, v.toArray());
-	}
-
-	public Matrix(int size, boolean translate, float... vec) {
-		this(size);
-		if (translate) {
-			vec = adjustSize(vec, size, 0);
-			vec[size - 1] = 0;
-			for (int row = 0; row < size; row++) {
-				float dot = 0;
-				for (int col = 0; col < size; col++) {
-					dot += mat[col][row] * vec[col];
-				}
-				mat[size - 1][row] += dot;
-			}
-		} else {
-			vec = adjustSize(vec, size, 1);
-			for (int colrow = 0; colrow < size; colrow++) {
-				mat[colrow][colrow] *= vec[colrow];
-			}
-		}
-	}
-
-	public Matrix(int size, Complex rot) {
-		this(size);
-		if (size < 2) {
-			throw new IllegalArgumentException("Minimum matrix size is 2");
-		}
-		rot = rot.normalize();
-		mat[0][0] = rot.getX();
-		mat[0][1] = -rot.getY();
-		mat[1][0] = rot.getY();
-		mat[1][1] = rot.getX();
-	}
-
-	public Matrix(int size, Quaternion rot) {
-		this(size);
-		if (size < 3) {
-			throw new IllegalArgumentException("Minimum matrix size is 3");
-		}
-		rot = rot.normalize();
-		mat[0][0] = 1 - 2 * rot.getY() * rot.getY() - 2 * rot.getZ() * rot.getZ();
-		mat[0][1] = 2 * rot.getX() * rot.getY() - 2 * rot.getW() * rot.getZ();
-		mat[0][2] = 2 * rot.getX() * rot.getZ() + 2 * rot.getW() * rot.getY();
-		mat[1][0] = 2 * rot.getX() * rot.getY() + 2 * rot.getW() * rot.getZ();
-		mat[1][1] = 1 - 2 * rot.getX() * rot.getX() - 2 * rot.getZ() * rot.getZ();
-		mat[1][2] = 2 * rot.getY() * rot.getZ() - 2 * rot.getW() * rot.getX();
-		mat[2][0] = 2 * rot.getX() * rot.getZ() - 2 * rot.getW() * rot.getY();
-		mat[2][1] = 2 * rot.getY() * rot.getZ() + 2.f * rot.getX() * rot.getW();
-		mat[2][2] = 1 - 2 * rot.getX() * rot.getX() - 2 * rot.getY() * rot.getY();
-	}
-
 	public int size() {
 		return mat.length;
 	}
@@ -204,7 +131,7 @@ public class Matrix implements Serializable, Cloneable {
 	}
 
 	public Matrix translate(float... v) {
-		return new Matrix(size(), true, v).mul(this);
+		return createTranslation(size(), v).mul(this);
 	}
 
 	public Matrix scale(Vector2 v) {
@@ -224,15 +151,15 @@ public class Matrix implements Serializable, Cloneable {
 	}
 
 	public Matrix scale(float... v) {
-		return new Matrix(size(), false, v).mul(this);
+		return createScaling(size(), v).mul(this);
 	}
 
 	public Matrix rotate(Complex rot) {
-		return new Matrix(size(), rot).mul(this);
+		return createRotation(size(), rot).mul(this);
 	}
 
 	public Matrix rotate(Quaternion rot) {
-		return new Matrix(size(), rot).mul(this);
+		return createRotation(size(), rot).mul(this);
 	}
 
 	public Vector2 transform(Vector2 v) {
@@ -545,5 +472,99 @@ public class Matrix implements Serializable, Cloneable {
 				aug.set(col, row - size, val);
 			}
 		}
+	}
+
+	public static Matrix createScaling(int size, double scale) {
+		return createScaling(size, (float) scale);
+	}
+
+	public static Matrix createScaling(int size, float scale) {
+		return createScaling(size, adjustSize(new float[0], size, scale));
+	}
+
+	public static Matrix createScaling(int size, Vector2 v) {
+		return createScaling(size, v.getX(), v.getY());
+	}
+
+	public static Matrix createScaling(int size, Vector3 v) {
+		return createScaling(size, v.getX(), v.getY(), v.getZ());
+	}
+
+	public static Matrix createScaling(int size, Vector4 v) {
+		return createScaling(size, v.getX(), v.getY(), v.getW());
+	}
+
+	public static Matrix createScaling(int size, Vector v) {
+		return createScaling(size, v.toArray());
+	}
+
+	public static Matrix createScaling(int size, float... vec) {
+		final Matrix m = new Matrix(size);
+		vec = adjustSize(vec, size, 1);
+		for (int colrow = 0; colrow < size; colrow++) {
+			m.set(colrow, colrow, vec[colrow]);
+		}
+		return m;
+	}
+
+	public static Matrix createTranslation(int size, Vector2 v) {
+		return createTranslation(size, v.getX(), v.getY());
+	}
+
+	public static Matrix createTranslation(int size, Vector3 v) {
+		return createTranslation(size, v.getX(), v.getY(), v.getZ());
+	}
+
+	public static Matrix createTranslation(int size, Vector4 v) {
+		return createTranslation(size, v.getX(), v.getY(), v.getW());
+	}
+
+	public static Matrix createTranslation(int size, Vector v) {
+		return createTranslation(size, v.toArray());
+	}
+
+	public static Matrix createTranslation(int size, float... vec) {
+		final Matrix m = new Matrix(size);
+		vec = adjustSize(vec, size, 0);
+		vec[size - 1] = 0;
+		for (int row = 0; row < size; row++) {
+			float dot = 0;
+			for (int col = 0; col < size; col++) {
+				dot += m.get(col, row) * vec[col];
+			}
+			m.set(size - 1, row, m.get(size - 1, row) + dot);
+		}
+		return m;
+	}
+
+	public static Matrix createRotation(int size, Complex rot) {
+		if (size < 2) {
+			throw new IllegalArgumentException("Minimum matrix size is 2");
+		}
+		final Matrix m = new Matrix(size);
+		rot = rot.normalize();
+		m.set(0, 0, rot.getX());
+		m.set(0, 1, -rot.getY());
+		m.set(1, 0, rot.getY());
+		m.set(1, 1, rot.getX());
+		return m;
+	}
+
+	public static Matrix createRotation(int size, Quaternion rot) {
+		if (size < 3) {
+			throw new IllegalArgumentException("Minimum matrix size is 3");
+		}
+		final Matrix m = new Matrix(size);
+		rot = rot.normalize();
+		m.set(0, 0, 1 - 2 * rot.getY() * rot.getY() - 2 * rot.getZ() * rot.getZ());
+		m.set(0, 1, 2 * rot.getX() * rot.getY() - 2 * rot.getW() * rot.getZ());
+		m.set(0, 2, 2 * rot.getX() * rot.getZ() + 2 * rot.getW() * rot.getY());
+		m.set(1, 0, 2 * rot.getX() * rot.getY() + 2 * rot.getW() * rot.getZ());
+		m.set(1, 1, 1 - 2 * rot.getX() * rot.getX() - 2 * rot.getZ() * rot.getZ());
+		m.set(1, 2, 2 * rot.getY() * rot.getZ() - 2 * rot.getW() * rot.getX());
+		m.set(2, 0, 2 * rot.getX() * rot.getZ() - 2 * rot.getW() * rot.getY());
+		m.set(2, 1, 2 * rot.getY() * rot.getZ() + 2.f * rot.getX() * rot.getW());
+		m.set(2, 2, 1 - 2 * rot.getX() * rot.getX() - 2 * rot.getY() * rot.getY());
+		return m;
 	}
 }

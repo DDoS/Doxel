@@ -246,11 +246,11 @@ public class Vector4 implements Comparable<Vector4>, Serializable, Cloneable {
 	}
 
 	public Matrix toScalingMatrix(int size) {
-		return new Matrix(size, false, this);
+		return Matrix.createScaling(size, this);
 	}
 
 	public Matrix toTranslationMatrix(int size) {
-		return new Matrix(size, false, this);
+		return Matrix.createTranslation(size, this);
 	}
 
 	@Override

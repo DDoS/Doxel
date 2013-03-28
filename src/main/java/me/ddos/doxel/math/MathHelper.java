@@ -1,10 +1,5 @@
 package me.ddos.doxel.math;
 
-import java.nio.FloatBuffer;
-import java.util.Random;
-import org.lwjgl.BufferUtils;
-import org.lwjgl.util.vector.Matrix4f;
-
 /**
  *
  * @author DDoS

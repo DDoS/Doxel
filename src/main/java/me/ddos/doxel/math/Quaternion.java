@@ -15,56 +15,22 @@ public class Quaternion implements Comparable<Quaternion>, Serializable, Cloneab
 	private final float w;
 
 	public Quaternion() {
-		this(0, 0, 0, 1, false);
+		this(0, 0, 0, 1);
 	}
 
 	public Quaternion(Quaternion q) {
-		this(q.x, q.y, q.z, q.w, false);
+		this(q.x, q.y, q.z, q.w);
 	}
 
-	public Quaternion(double x, double y, double z, double w, boolean ignored) {
-		this((float) x, (float) y, (float) z, (float) w, ignored);
+	public Quaternion(double x, double y, double z, double w) {
+		this((float) x, (float) y, (float) z, (float) w);
 	}
 
-	public Quaternion(float x, float y, float z, float w, boolean ingored) {
+	public Quaternion(float x, float y, float z, float w) {
 		this.x = x;
 		this.y = y;
 		this.z = z;
 		this.w = w;
-	}
-
-	public Quaternion(double pitch, double yaw, double roll) {
-		this((float) pitch, (float) yaw, (float) roll);
-	}
-
-	public Quaternion(float pitch, float yaw, float roll) {
-		this(new Quaternion(yaw, Vector3.UNIT_Y).mul(new Quaternion(pitch, Vector3.UNIT_X)).
-				mul(new Quaternion(roll, Vector3.UNIT_Z)));
-	}
-
-	public Quaternion(Vector3 from, Vector3 to) {
-		this(Math.toDegrees(Math.acos(from.dot(to) / (from.length() * to.length()))), from.cross(to));
-	}
-
-	public Quaternion(double angle, Vector3 axis) {
-		this((float) angle, axis);
-	}
-
-	public Quaternion(float angle, Vector3 axis) {
-		this(angle, axis.getX(), axis.getY(), axis.getZ());
-	}
-
-	public Quaternion(double angle, double x, double y, double z) {
-		this((float) angle, (float) x, (float) y, (float) z);
-	}
-
-	public Quaternion(float angle, float x, float y, float z) {
-		final double halfAngle = Math.toRadians(angle) / 2;
-		final double q = Math.sin(halfAngle) / Math.sqrt(x * x + y * y + z * z);
-		this.x = (float) (x * q);
-		this.y = (float) (y * q);
-		this.z = (float) (z * q);
-		this.w = (float) Math.cos(halfAngle);
 	}
 
 	public float getX() {
@@ -83,79 +49,51 @@ public class Quaternion implements Comparable<Quaternion>, Serializable, Cloneab
 		return w;
 	}
 
-	public Quaternion mul(double pitch, double yaw, double roll) {
-		return mul(new Quaternion(pitch, yaw, roll));
-	}
-
-	public Quaternion mul(float pitch, float yaw, float roll) {
-		return mul(new Quaternion(pitch, yaw, roll));
-	}
-
-	public Quaternion mul(Vector3 from, Vector3 to) {
-		return mul(new Quaternion(from, to));
-	}
-
-	public Quaternion mul(double angle, Vector3 axis) {
-		return mul(new Quaternion(angle, axis));
-	}
-
-	public Quaternion mul(float angle, Vector3 axis) {
-		return mul(new Quaternion(angle, axis));
-	}
-
-	public Quaternion mul(double angle, double x, double y, double z) {
-		return mul(new Quaternion(angle, x, y, z));
-	}
-
-	public Quaternion mul(float angle, float x, float y, float z) {
-		return mul(new Quaternion(angle, x, y, z));
-	}
-
 	public Quaternion mul(Quaternion q) {
-		return mul(q.x, q.y, q.z, q.w, false);
+		return mul(q.x, q.y, q.z, q.w);
 	}
 
-	public Quaternion mul(double x, double y, double z, double w, boolean ignored) {
-		return mul((float) x, (float) y, (float) z, (float) w, ignored);
+	public Quaternion mul(double x, double y, double z, double w) {
+		return mul((float) x, (float) y, (float) z, (float) w);
 	}
 
-	public Quaternion mul(float x, float y, float z, float w, boolean ignored) {
+	public Quaternion mul(float x, float y, float z, float w) {
 		return new Quaternion(
 				this.w * x + this.x * w + this.y * z - this.z * y,
 				this.w * y + this.y * w + this.z * x - this.x * z,
 				this.w * z + this.z * w + this.x * y - this.y * x,
-				this.w * w - this.x * x - this.y * y - this.z * z,
-				false);
+				this.w * w - this.x * x - this.y * y - this.z * z);
 	}
 
 	public Vector3 getDirection() {
 		return toRotationMatrix(3).transform(Vector3.UNIT_Z);
 	}
 
-	public Vector3 getAxisAngles() {
-		final double r1;
-		final double r2;
-		final double r3;
+	public Vector3 getAxesAnglesRad() {
+		final double roll;
+		final double pitch;
+		double yaw;
 		final double test = w * x - y * z;
 		if (Math.abs(test) < 0.4999) {
-			r1 = Math.atan2(2 * (w * z + x * y), 1 - 2 * (x * x + z * z));
-			r2 = Math.asin(2 * test);
-			r3 = Math.atan2(2 * (w * y + z * x), 1 - 2 * (x * x + y * y));
+			roll = Math.atan2(2 * (w * z + x * y), 1 - 2 * (x * x + z * z));
+			pitch = Math.asin(2 * test);
+			yaw = Math.atan2(2 * (w * y + z * x), 1 - 2 * (x * x + y * y));
 		} else {
 			int sign = (test < 0) ? -1 : 1;
-			r1 = 0;
-			r2 = sign * Math.PI / 2;
-			r3 = -sign * 2 * Math.atan2(z, w);
+			roll = 0;
+			pitch = sign * Math.PI / 2;
+			yaw = -sign * 2 * Math.atan2(z, w);
 		}
-		final double roll = Math.toDegrees(r1);
-		final double pitch = Math.toDegrees(r2);
-		double yaw = Math.toDegrees(r3);
 		if (yaw > 180) {
 			yaw -= 360;
 		} else if (yaw < -180) {
 			yaw += 360;
 		}
 		return new Vector3(pitch, yaw, roll);
+	}
+
+	public Vector3 getAxesAngleDeg() {
+		return getAxesAnglesRad().scale(180 / Math.PI);
 	}
 
 	public float lengthSquared() {
@@ -168,11 +106,11 @@ public class Quaternion implements Comparable<Quaternion>, Serializable, Cloneab
 
 	public Quaternion normalize() {
 		final float length = length();
-		return new Quaternion(x / length, y / length, z / length, w / length, false);
+		return new Quaternion(x / length, y / length, z / length, w / length);
 	}
 
 	public Matrix toRotationMatrix(int size) {
-		return new Matrix(size, this);
+		return Matrix.createRotation(size, this);
 	}
 
 	@Override
@@ -219,5 +157,67 @@ public class Quaternion implements Comparable<Quaternion>, Serializable, Cloneab
 	@Override
 	public String toString() {
 		return "(" + x + ", " + y + ", " + z + ", " + w + ")";
+	}
+
+	public static Quaternion fromAxesAnglesDeg(double pitch, double yaw, double roll) {
+		return fromAxesAnglesDeg((float) pitch, (float) yaw, (float) roll);
+	}
+
+	public static Quaternion fromAxesAnglesRad(double pitch, double yaw, double roll) {
+		return fromAxesAnglesRad((float) pitch, (float) yaw, (float) roll);
+	}
+
+	public static Quaternion fromAxesAnglesDeg(float pitch, float yaw, float roll) {
+		return Quaternion.fromAngleDegAxis(yaw, Vector3.UNIT_Y).
+				mul(Quaternion.fromAngleDegAxis(pitch, Vector3.UNIT_X)).
+				mul(Quaternion.fromAngleDegAxis(roll, Vector3.UNIT_Z));
+	}
+
+	public static Quaternion fromAxesAnglesRad(float pitch, float yaw, float roll) {
+		return Quaternion.fromAngleRadAxis(yaw, Vector3.UNIT_Y).
+				mul(Quaternion.fromAngleRadAxis(pitch, Vector3.UNIT_X)).
+				mul(Quaternion.fromAngleRadAxis(roll, Vector3.UNIT_Z));
+	}
+
+	public static Quaternion fromRotationTo(Vector3 from) {
+		return Quaternion.fromRotationTo(from, Vector3.UNIT_Z);
+	}
+
+	public static Quaternion fromRotationTo(Vector3 from, Vector3 to) {
+		return Quaternion.fromAngleRadAxis(Math.acos(from.dot(to) / (from.length() * to.length())), from.cross(to));
+	}
+
+	public static Quaternion fromAngleDegAxis(double angle, Vector3 axis) {
+		return fromAngleRadAxis(Math.toRadians(angle), axis);
+	}
+
+	public static Quaternion fromAngleRadAxis(double angle, Vector3 axis) {
+		return fromAngleRadAxis((float) angle, axis);
+	}
+
+	public static Quaternion fromAngleDegAxis(float angle, Vector3 axis) {
+		return fromAngleRadAxis((float) Math.toRadians(angle), axis);
+	}
+
+	public static Quaternion fromAngleRadAxis(float angle, Vector3 axis) {
+		return fromAngleRadAxis(angle, axis.getX(), axis.getY(), axis.getZ());
+	}
+
+	public static Quaternion fromAngleDegAxis(double angle, double x, double y, double z) {
+		return fromAngleRadAxis(Math.toDegrees(angle), x, y, z);
+	}
+
+	public static Quaternion fromAngleRadAxis(double angle, double x, double y, double z) {
+		return fromAngleRadAxis((float) angle, (float) x, (float) y, (float) z);
+	}
+
+	public static Quaternion fromAngleDegAxis(float angle, float x, float y, float z) {
+		return fromAngleRadAxis((float) Math.toRadians(angle), x, y, z);
+	}
+
+	public static Quaternion fromAngleRadAxis(float angle, float x, float y, float z) {
+		final double halfAngle = angle / 2;
+		final double q = Math.sin(halfAngle) / Math.sqrt(x * x + y * y + z * z);
+		return new Quaternion(x * q, y * q, z * q, Math.cos(halfAngle));
 	}
 }

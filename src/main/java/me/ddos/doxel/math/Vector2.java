@@ -224,11 +224,11 @@ public class Vector2 implements Comparable<Vector2>, Serializable, Cloneable {
 	}
 
 	public Matrix toScalingMatrix(int size) {
-		return new Matrix(size, false, this);
+		return Matrix.createScaling(size, this);
 	}
 
 	public Matrix toTranslationMatrix(int size) {
-		return new Matrix(size, true, this);
+		return Matrix.createTranslation(size, this);
 	}
 
 	@Override

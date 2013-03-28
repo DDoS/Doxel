@@ -25,19 +25,6 @@ public class Complex implements Comparable<Complex>, Serializable, Cloneable {
 		this.y = y;
 	}
 
-	public Complex(Vector2 from, Vector2 to) {
-		this(Math.toDegrees(Math.acos(from.dot(to) / (from.length() * to.length()))));
-	}
-
-	public Complex(double angle) {
-		this((float) angle);
-	}
-
-	public Complex(float angle) {
-		this.x = (float) Math.cos(Math.toRadians(angle));
-		this.y = (float) Math.sin(Math.toRadians(angle));
-	}
-
 	public Complex(Complex c) {
 		this.x = c.x;
 		this.y = c.y;
@@ -49,18 +36,6 @@ public class Complex implements Comparable<Complex>, Serializable, Cloneable {
 
 	public float getY() {
 		return y;
-	}
-
-	public Complex mul(Vector2 from, Vector2 to) {
-		return mul(new Complex(from, to));
-	}
-
-	public Complex mul(double angle) {
-		return mul(new Complex(angle));
-	}
-
-	public Complex mul(float angle) {
-		return mul(new Complex(angle));
 	}
 
 	public Complex mul(Complex c) {
@@ -81,8 +56,12 @@ public class Complex implements Comparable<Complex>, Serializable, Cloneable {
 		return new Vector2(x, y);
 	}
 
-	public float getAngle() {
-		return (float) Math.toDegrees(Math.atan2(x, y));
+	public float getAngleRad() {
+		return (float) Math.atan2(x, y);
+	}
+
+	public float getAngleDeg() {
+		return (float) Math.toDegrees(getAngleRad());
 	}
 
 	public float lengthSquared() {
@@ -99,7 +78,7 @@ public class Complex implements Comparable<Complex>, Serializable, Cloneable {
 	}
 
 	public Matrix toRotationMatrix(int size) {
-		return new Matrix(size, this);
+		return Matrix.createRotation(size, this);
 	}
 
 	@Override
@@ -138,5 +117,25 @@ public class Complex implements Comparable<Complex>, Serializable, Cloneable {
 	@Override
 	public String toString() {
 		return "(" + x + ", " + y + ")";
+	}
+
+	public static Complex fromRotationTo(Vector2 from, Vector2 to) {
+		return fromAngleRad(Math.acos(from.dot(to) / (from.length() * to.length())));
+	}
+
+	public static Complex fromAngleDeg(double angle) {
+		return fromAngleRad(Math.toRadians(angle));
+	}
+
+	public static Complex fromAngleRad(double angle) {
+		return fromAngleRad((float) angle);
+	}
+
+	public static Complex fromAngleDeg(float angle) {
+		return fromAngleRad((float) Math.toRadians(angle));
+	}
+
+	public static Complex fromAngleRad(float angle) {
+		return new Complex((float) Math.cos(angle), (float) Math.sin(angle));
 	}
 }

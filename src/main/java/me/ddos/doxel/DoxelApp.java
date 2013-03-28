@@ -217,8 +217,8 @@ public class DoxelApp {
 		if (mouseGrabbed) {
 			cameraYaw += Mouse.getDY() * mouseSensitivity;
 			cameraPitch -= Mouse.getDX() * mouseSensitivity;
-			final Quaternion yaw = new Quaternion(cameraYaw, 1, 0, 0);
-			final Quaternion pitch = new Quaternion(cameraPitch, 0, 1, 0);
+			final Quaternion yaw = Quaternion.fromAngleDegAxis(cameraYaw, 1, 0, 0);
+			final Quaternion pitch = Quaternion.fromAngleDegAxis(cameraPitch, 0, 1, 0);
 			Doxel.cameraRotation(pitch.mul(yaw));
 		}
 		final Vector3 right = Doxel.cameraRight();
