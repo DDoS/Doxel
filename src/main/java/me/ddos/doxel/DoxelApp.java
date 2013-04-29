@@ -72,7 +72,13 @@ public class DoxelApp {
 			while (!Display.isCloseRequested()) {
 				final long start = System.nanoTime();
 				processInput();
+				if (plugin != null) {
+					plugin.preRender();
+				}
 				Doxel.render();
+				if (plugin != null) {
+					plugin.postRender();
+				}
 				Thread.sleep(Math.max(50 - (long) Math.round((System.nanoTime() - start) / 1000000d), 0));
 			}
 			if (plugin != null) {

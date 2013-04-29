@@ -17,4 +17,14 @@ public interface DoxelPlugin {
 	 * before the Display is destroyed.
 	 */
 	public void unload();
+
+	/**
+	 * Called inside the render cycle, before the new render is created.
+	 */
+	public void preRender();
+
+	/**
+	 * Called inside the render cycle, after the new render is created and displayed.
+	 */
+	public void postRender();
 }
