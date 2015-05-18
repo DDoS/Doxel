@@ -1,1 +1,1 @@
-Doxel is a simple OpenGL 3.2 renderer. It can currently load one external jar as a plugin, which will provide functionality.
+Doxel is a scalar field renderer based on OpenGL. It can currently load one external jar as a plugin, which will provide functionality.

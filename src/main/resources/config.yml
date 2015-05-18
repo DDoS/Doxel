@@ -4,10 +4,10 @@ Input:
     # Speed of the camera for moving about.
     CameraSpeed: 0.4
 Appearance:
-    # Title of the render window.
-    WindowTitle: Doxel
     # Window sise in width and height.
     WindowSize: 1200, 800
+    # Frames per second
+    FPS: 60
     # Field of view in degrees. Avoid values >= 180.
     FieldOfView: 75
     # Back ground color in RGB floats.
@@ -15,13 +15,11 @@ Appearance:
     # Model color in RGB floats.
     ModelColor: 1, 0.1, 0.1
     # Diffuse intensity in each RGB floats component.
-    DiffuseIntensity: 0.9
+    DiffuseIntensity: 0.6
     # Specular intensity in each RGB floats component.
     SpecularIntensity: 0.3
     # Ambient light intensity in each floats RGB component.
     AmbientIntensity: 0.1
-    # How much distance affects light intensity.
-    LightAttenuation: 0.2
 Model:
     # Position of the model in floats.
     ModelPosition: -15, -15, -15
