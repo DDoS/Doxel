@@ -57,9 +57,14 @@ nbproject
 atlassian-ide-plugin.xml
 build.xml
 nb-configuration.xml
+nbactions.xml
 *.iml
 *.ipr
 *.iws
+
+# Runtime #
+###########
+run
 
 # Misc files #
 ##############
