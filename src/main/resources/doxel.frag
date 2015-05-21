@@ -23,7 +23,7 @@ void main() {
     float diffuseTerm = diffuseIntensity * max(0, dot(nNormalView, nLightDirectionView));
     float specularTerm;
     if (diffuseTerm > 0) {
-        specularTerm = specularIntensity * pow(max(0, dot(reflect(nLightDirectionView, nNormalView), normalize(positionView))), 50);
+        specularTerm = specularIntensity * pow(max(0, dot(reflect(-nLightDirectionView, nNormalView), normalize(positionView))), 50);
     } else {
         specularTerm = 0;
     }

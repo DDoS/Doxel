@@ -19,5 +19,5 @@ void main() {
     positionView = (viewMatrix * modelMatrix * vec4(position, 1)).xyz;
     gl_Position = projectionMatrix * vec4(positionView, 1);
     normalView = (normalMatrix * vec4(normal, 0)).xyz;
-    lightPositionView = (viewMatrix * modelMatrix * vec4(lightPosition, 1)).xyz;
+    lightPositionView = (viewMatrix * vec4(lightPosition, 1)).xyz;
 }

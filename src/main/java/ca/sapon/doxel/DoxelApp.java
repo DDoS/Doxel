@@ -149,7 +149,7 @@ public class DoxelApp {
             position = position.add(up.mul(-correctedCameraSpeed));
         }
         camera.setPosition(position);
-        Doxel.lightPosition(position.negate());
+        Doxel.lightPosition(position);
     }
 
     /**
