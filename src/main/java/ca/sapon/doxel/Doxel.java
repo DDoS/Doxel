@@ -117,9 +117,6 @@ public class Doxel {
         if (!created) {
             throw new IllegalStateException("Display needs to be created first.");
         }
-        if (models.isEmpty()) {
-            throw new IllegalStateException("At least one model needs to be created first.");
-        }
         final long start = System.nanoTime();
         pipeline.run(context);
         final long delta = Math.round((System.nanoTime() - start) / 1e6);
@@ -148,6 +145,9 @@ public class Doxel {
      * @param vertexData The mesh of the model
      */
     public static Model createModel(VertexData vertexData, Vector3f color) {
+        if (vertexData.getIndicesCount() == 0) {
+            return null;
+        }
         final VertexArray vertexArray = context.newVertexArray();
         vertexArray.create();
         vertexArray.setData(vertexData);

@@ -67,7 +67,9 @@ public class DoxelApp {
             final VertexData mesh = polygonizer.createMesh(noiseSource, meshResolution, modelPosition, modelSize);
             System.out.println(" done.");
             Doxel.create(windowWidth, windowHeight, fieldOfView);
-            Doxel.createModel(mesh, modelColor);
+            if (Doxel.createModel(mesh, modelColor) == null) {
+                System.out.println("Generated mesh is empty.");
+            }
             Doxel.fps(fps);
             Mouse.setGrabbed(true);
             while (!Display.isCloseRequested()) {
