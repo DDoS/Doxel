@@ -19,6 +19,8 @@ import ca.sapon.doxel.NoiseSource;
  * @see GridCell
  */
 public abstract class Polygonizer {
+    protected double threshold = 0.5;
+
     /**
      * Generates the model's mesh from the noise source using the provided polygonizer.
      *
@@ -83,4 +85,22 @@ public abstract class Polygonizer {
      * @return The next current available index.
      */
     protected abstract int polygonize(GridCell cell, TFloatList positions, TFloatList normals, TIntList indices, int index);
+
+    /**
+     * Gets the threshold which is the minimum value before a value is considered as being outside the mesh.
+     *
+     * @return The threshold value.
+     */
+    public double threshold() {
+        return threshold;
+    }
+
+    /**
+     * Sets the threshold which is the minimum value before a value is considered as being outside the mesh.
+     *
+     * @param threshold The threshold value.
+     */
+    public void threshold(double threshold) {
+        this.threshold = threshold;
+    }
 }

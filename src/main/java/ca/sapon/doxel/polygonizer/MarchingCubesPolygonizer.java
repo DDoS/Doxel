@@ -303,7 +303,6 @@ public class MarchingCubesPolygonizer extends Polygonizer {
             {0, 3, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
             {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}
     };
-    private double threshold = 0;
 
     @Override
     public int polygonize(GridCell cell, TFloatList positions, TFloatList normals, TIntList indices, int index) {
@@ -411,24 +410,6 @@ public class MarchingCubesPolygonizer extends Polygonizer {
         }
 
         return index;
-    }
-
-    /**
-     * Gets the threshold which is the minimum value before a value is considered as being outside the mesh.
-     *
-     * @return The threshold value.
-     */
-    public double threshold() {
-        return threshold;
-    }
-
-    /**
-     * Sets the threshold which is the minimum value before a value is considered as being outside the mesh.
-     *
-     * @param threshold The threshold value.
-     */
-    public void threshold(double threshold) {
-        this.threshold = threshold;
     }
 
     private Vector3f lerp(Vector3f p1, Vector3f p2, double valp1, double valp2) {

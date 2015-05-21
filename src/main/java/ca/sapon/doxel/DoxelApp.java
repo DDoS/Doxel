@@ -162,6 +162,15 @@ public class DoxelApp {
     }
 
     /**
+     * Gets the polygonizer in use.
+     *
+     * @return The polygonizer in use.
+     */
+    public static Polygonizer polygonizer() {
+        return polygonizer;
+    }
+
+    /**
      * Sets the polygonizer to use.
      *
      * @param polygonizer The polygonizer to use.
