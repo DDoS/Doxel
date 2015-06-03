@@ -7,19 +7,21 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Map;
 
+import org.lwjgl.Sys;
+import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
+import org.lwjgl.opengl.Display;
+import org.yaml.snakeyaml.Yaml;
+
 import com.flowpowered.caustic.api.Camera;
 import com.flowpowered.caustic.api.data.VertexData;
+import com.flowpowered.caustic.api.model.Model;
 import com.flowpowered.caustic.lwjgl.LWJGLUtil;
 import com.flowpowered.math.imaginary.Quaternionf;
 import com.flowpowered.math.vector.Vector3f;
 
 import ca.sapon.doxel.polygonizer.MarchingCubesPolygonizer;
 import ca.sapon.doxel.polygonizer.Polygonizer;
-import org.lwjgl.Sys;
-import org.lwjgl.input.Keyboard;
-import org.lwjgl.input.Mouse;
-import org.lwjgl.opengl.Display;
-import org.yaml.snakeyaml.Yaml;
 
 /**
  * The main class of this application.
@@ -67,8 +69,11 @@ public class DoxelApp {
             final VertexData mesh = polygonizer.createMesh(noiseSource, meshResolution, modelPosition, modelSize);
             System.out.println(" done.");
             Doxel.create(windowWidth, windowHeight, fieldOfView);
-            if (Doxel.createModel(mesh, modelColor) == null) {
+            final Model model = Doxel.createModel(mesh, modelColor);
+            if (model == null) {
                 System.out.println("Generated mesh is empty.");
+            } else {
+                model.setScale(Vector3f.ONE.mul(meshResolution));
             }
             Doxel.fps(fps);
             Mouse.setGrabbed(true);

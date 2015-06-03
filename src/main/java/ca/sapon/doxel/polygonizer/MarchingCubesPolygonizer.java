@@ -2,15 +2,21 @@ package ca.sapon.doxel.polygonizer;
 
 import gnu.trove.list.TFloatList;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TFloatArrayList;
+import gnu.trove.list.array.TIntArrayList;
 
-import org.lwjgl.util.vector.Vector3f;
+import com.flowpowered.caustic.api.data.VertexData;
+import com.flowpowered.caustic.api.util.MeshGenerator;
+import com.flowpowered.math.GenericMath;
+import com.flowpowered.math.vector.Vector4i;
 
 /**
- * An implementation of the marching cubes algorithm based on <a href="http://paulbourke.net/geometry/polygonise/">this original implementation</a>.
+ * An implementation of the marching cubes algorithm using tables from <a href="http://paulbourke.net/geometry/polygonise/">this implementation</a>.
  *
  * @author DDoS
  */
 public class MarchingCubesPolygonizer extends Polygonizer {
+    // maps corner flags to edge flags
     private static final short[] EDGE_TABLE = {
             0x0, 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
             0x80c, 0x905, 0xa0f, 0xb06, 0xc0a, 0xd03, 0xe09, 0xf00,
@@ -45,6 +51,7 @@ public class MarchingCubesPolygonizer extends Polygonizer {
             0xf00, 0xe09, 0xd03, 0xc0a, 0xb06, 0xa0f, 0x905, 0x80c,
             0x70c, 0x605, 0x50f, 0x406, 0x30a, 0x203, 0x109, 0x0
     };
+    // maps corner flags to list of edge indices used to generate the triangles
     private static final byte[][] TRIANGLE_TABLE = {
             {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
             {0, 8, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
@@ -305,124 +312,306 @@ public class MarchingCubesPolygonizer extends Polygonizer {
     };
 
     @Override
-    public int polygonize(GridCell cell, TFloatList positions, TFloatList normals, TIntList indices, int index) {
+    public VertexData generateMesh(double[] densities, int xSize, int ySize, int zSize) {
+        /*
+        ^
+        | y
+        |
+        |     x
+        ------->
+        \
+         \
+          \ z
+          \/
 
-        final Vector3f[] vertices = new Vector3f[12];
-        int cubeIndex = 0;
+        4-----5
+        |\    |\a
+        | 7--b--6
+        | |   | |
+        0-|---1 c
+         \|    \|
+          3-----2
 
-        if (cell.v0 < threshold) {
-            cubeIndex |= 1;
-        }
-        if (cell.v1 < threshold) {
-            cubeIndex |= 2;
-        }
-        if (cell.v2 < threshold) {
-            cubeIndex |= 4;
-        }
-        if (cell.v3 < threshold) {
-            cubeIndex |= 8;
-        }
-        if (cell.v4 < threshold) {
-            cubeIndex |= 16;
-        }
-        if (cell.v5 < threshold) {
-            cubeIndex |= 32;
-        }
-        if (cell.v6 < threshold) {
-            cubeIndex |= 64;
-        }
-        if (cell.v7 < threshold) {
-            cubeIndex |= 128;
-        }
+        This implementation does no duplicate calculations and generates no duplicate data.
+        Every cell iterated generates only information for one new density point (6) and three
+        vertices (a, b and c). All other required information for generating a cell's mesh is
+        taken from the neighbours. Because the cells are between density points, no mesh is
+        generated for the outer layer (where some coordinate(s) are zero), but information is
+        generated so it can be used by the next layer (all coordinates are non zero).
+        */
+        // Generate position only, normals can be auto-generated from them
+        final TFloatList positions = new TFloatArrayList();
+        final TIntList indices = new TIntArrayList();
+        int index = 0;
+        // reused array that stores the indices of the edge vertices for the working cell
+        final int[] cellIndices = new int[12];
+        // for each cell, store the three unique vertex indices and the corner flags
+        final int[] cellInfo = new int[xSize * ySize * zSize * 4];
+        // The increments for offsets on x, y and z in the flat density array
+        final int xIncrement = 1;
+        final int yIncrement = xIncrement * xSize;
+        final int zIncrement = yIncrement * ySize;
+        // iterate the densities and keep track of the indices for each coordinate
+        for (int z = 0, zi = 0; z < zSize; z++, zi += zIncrement) {
+            for (int y = 0, yi = 0; y < ySize; y++, yi += yIncrement) {
+                for (int x = 0, xi = 0; x < xSize; x++, xi += xIncrement) {
+                    // the index of the working density
+                    final int densityIndex = xi + yi + zi;
+                    // flags to be built-up next for lookup in the tables
+                    int cornerFlags = 0;
+                    short edgeFlags = 0;
+                    // generate flag for v6
+                    if (densities[densityIndex] < threshold) {
+                        cornerFlags |= 64;
+                    }
+                    // different cases depending on the combination of zero and non-zero coordinates
+                    final int zerosMask = (x == 0 ? 0b1 : 0) | (y == 0 ? 0b10 : 0) | (z == 0 ? 0b100 : 0);
+                    switch (zerosMask) {
+                        case 0b000: {
+                            // reuse flags from the cell under: v4 to v7 reused for v0 to v3
+                            final int underCornerFlags = cellInfo[(densityIndex - yIncrement) * 4 + 3];
+                            cornerFlags |= (underCornerFlags & 16) >> 4;
+                            cornerFlags |= (underCornerFlags & 32) >> 4;
+                            cornerFlags |= (underCornerFlags & 64) >> 4;
+                            cornerFlags |= (underCornerFlags & 128) >> 4;
+                            // reuse flags from the cell to the left: v5 and v6 reused for v4 and v7
+                            final int leftCornerFlags = cellInfo[(densityIndex - xIncrement) * 4 + 3];
+                            cornerFlags |= (leftCornerFlags & 32) >> 1;
+                            cornerFlags |= (leftCornerFlags & 64) << 1;
+                            // reuse flags from the cell behind: v6 reused for v5
+                            final int behindCornerFlags = cellInfo[(densityIndex - zIncrement) * 4 + 3];
+                            cornerFlags |= (behindCornerFlags & 64) >> 1;
+                            // get the corresponding edge flags
+                            edgeFlags = EDGE_TABLE[cornerFlags];
+                            // add a vertex on edge v6 to v7 if needed
+                            if ((edgeFlags & 64) == 64) {
+                                positions.add(x + lerp(densities[densityIndex - xIncrement], densities[densityIndex]));
+                                positions.add(y);
+                                positions.add(z);
+                                cellInfo[densityIndex * 4 + 1] = index++;
+                            }
+                            // add a vertex on edge v5 to v6 if needed
+                            if ((edgeFlags & 32) == 32) {
+                                positions.add(x);
+                                positions.add(y);
+                                positions.add(z + lerp(densities[densityIndex - zIncrement], densities[densityIndex]));
+                                cellInfo[densityIndex * 4] = index++;
+                            }
+                            // add a vertex on edge v2 to v6 if needed
+                            if ((edgeFlags & 1024) == 1024) {
+                                positions.add(x);
+                                positions.add(y + lerp(densities[densityIndex - yIncrement], densities[densityIndex]));
+                                positions.add(z);
+                                cellInfo[densityIndex * 4 + 2] = index++;
+                            }
+                            break;
+                        }
+                        case 0b001: {
+                            // reuse flags from the cell under: v5 and v6 reused for v1 and v2
+                            final int underCornerFlags = cellInfo[(densityIndex - yIncrement) * 4 + 3];
+                            cornerFlags |= (underCornerFlags & 32) >> 4;
+                            cornerFlags |= (underCornerFlags & 64) >> 4;
+                            // reuse flags from the cell behind: v6 reused for v5
+                            final int behindCornerFlags = cellInfo[(densityIndex - zIncrement) * 4 + 3];
+                            cornerFlags |= (behindCornerFlags & 64) >> 1;
+                            // get the corresponding edge flags
+                            edgeFlags = EDGE_TABLE[cornerFlags];
+                            // add a vertex on edge v5 to v6 if needed
+                            if ((edgeFlags & 32) == 32) {
+                                positions.add(x);
+                                positions.add(y);
+                                positions.add(z + lerp(densities[densityIndex - zIncrement], densities[densityIndex]));
+                                cellInfo[densityIndex * 4] = index++;
+                            }
+                            // add a vertex on edge v2 to v6 if needed
+                            if ((edgeFlags & 1024) == 1024) {
+                                positions.add(x);
+                                positions.add(y + lerp(densities[densityIndex - yIncrement], densities[densityIndex]));
+                                positions.add(z);
+                                cellInfo[densityIndex * 4 + 2] = index++;
+                            }
 
-        if (EDGE_TABLE[cubeIndex] == 0) {
-            return index;
-        }
+                            break;
+                        }
+                        case 0b010: {
+                            // reuse flags from the cell to the left: v5 and v6 reused for v4 and v7
+                            final int leftCornerFlags = cellInfo[(densityIndex - xIncrement) * 4 + 3];
+                            cornerFlags |= (leftCornerFlags & 32) >> 1;
+                            cornerFlags |= (leftCornerFlags & 64) << 1;
+                            // reuse flags from the cell behind: v6 reused for v5
+                            final int behindCornerFlags = cellInfo[(densityIndex - zIncrement) * 4 + 3];
+                            cornerFlags |= (behindCornerFlags & 64) >> 1;
+                            // get the corresponding edge flags
+                            edgeFlags = EDGE_TABLE[cornerFlags];
+                            // add a vertex on edge v5 to v6 if needed
+                            if ((edgeFlags & 32) == 32) {
+                                positions.add(x);
+                                positions.add(y);
+                                positions.add(z + lerp(densities[densityIndex - zIncrement], densities[densityIndex]));
+                                cellInfo[densityIndex * 4] = index++;
+                            }
+                            // add a vertex on edge v6 to v7 if needed
+                            if ((edgeFlags & 64) == 64) {
+                                positions.add(x + lerp(densities[densityIndex - xIncrement], densities[densityIndex]));
+                                positions.add(y);
+                                positions.add(z);
+                                cellInfo[densityIndex * 4 + 1] = index++;
+                            }
 
-        if ((EDGE_TABLE[cubeIndex] & 1) == 1) {
-            vertices[0] = lerp(cell.p0, cell.p1, cell.v0, cell.v1);
-        }
-        if ((EDGE_TABLE[cubeIndex] & 2) == 2) {
-            vertices[1] = lerp(cell.p1, cell.p2, cell.v1, cell.v2);
-        }
-        if ((EDGE_TABLE[cubeIndex] & 4) == 4) {
-            vertices[2] = lerp(cell.p2, cell.p3, cell.v2, cell.v3);
-        }
-        if ((EDGE_TABLE[cubeIndex] & 8) == 8) {
-            vertices[3] = lerp(cell.p3, cell.p0, cell.v3, cell.v0);
-        }
-        if ((EDGE_TABLE[cubeIndex] & 16) == 16) {
-            vertices[4] = lerp(cell.p4, cell.p5, cell.v4, cell.v5);
-        }
-        if ((EDGE_TABLE[cubeIndex] & 32) == 32) {
-            vertices[5] = lerp(cell.p5, cell.p6, cell.v5, cell.v6);
-        }
-        if ((EDGE_TABLE[cubeIndex] & 64) == 64) {
-            vertices[6] = lerp(cell.p6, cell.p7, cell.v6, cell.v7);
-        }
-        if ((EDGE_TABLE[cubeIndex] & 128) == 128) {
-            vertices[7] = lerp(cell.p7, cell.p4, cell.v7, cell.v4);
-        }
-        if ((EDGE_TABLE[cubeIndex] & 256) == 256) {
-            vertices[8] = lerp(cell.p0, cell.p4, cell.v0, cell.v4);
-        }
-        if ((EDGE_TABLE[cubeIndex] & 512) == 512) {
-            vertices[9] = lerp(cell.p1, cell.p5, cell.v1, cell.v5);
-        }
-        if ((EDGE_TABLE[cubeIndex] & 1024) == 1024) {
-            vertices[10] = lerp(cell.p2, cell.p6, cell.v2, cell.v6);
-        }
-        if ((EDGE_TABLE[cubeIndex] & 2048) == 2048) {
-            vertices[11] = lerp(cell.p3, cell.p7, cell.v3, cell.v7);
-        }
+                            break;
+                        }
+                        case 0b011: {
+                            // reuse flags from the cell behind: v6 reused for v5
+                            final int behindCornerFlags = cellInfo[(densityIndex - zIncrement) * 4 + 3];
+                            cornerFlags |= (behindCornerFlags & 64) >> 1;
+                            // get the corresponding edge flags
+                            edgeFlags = EDGE_TABLE[cornerFlags];
+                            // add a vertex on edge v5 to v6 if needed
+                            if ((edgeFlags & 32) == 32) {
+                                positions.add(x);
+                                positions.add(y);
+                                positions.add(z + lerp(densities[densityIndex - zIncrement], densities[densityIndex]));
+                                cellInfo[densityIndex * 4] = index++;
+                            }
 
-        for (int i = 0; TRIANGLE_TABLE[cubeIndex][i] != -1; i += 3) {
-            final Vector3f p0 = vertices[TRIANGLE_TABLE[cubeIndex][i]];
-            final Vector3f p1 = vertices[TRIANGLE_TABLE[cubeIndex][i + 1]];
-            final Vector3f p2 = vertices[TRIANGLE_TABLE[cubeIndex][i + 2]];
+                            break;
+                        }
+                        case 0b100: {
+                            // reuse flags from the cell under: v6 and v7 reused for v2 and v3
+                            final int underCornerFlags = cellInfo[(densityIndex - yIncrement) * 4 + 3];
+                            cornerFlags |= (underCornerFlags & 64) >> 4;
+                            cornerFlags |= (underCornerFlags & 128) >> 4;
+                            // reuse flags from the cell to the left: v6 reused for v7
+                            final int leftCornerFlags = cellInfo[(densityIndex - xIncrement) * 4 + 3];
+                            cornerFlags |= (leftCornerFlags & 64) << 1;
+                            // get the corresponding edge flags
+                            edgeFlags = EDGE_TABLE[cornerFlags];
+                            // add a vertex on edge v6 to v7 if needed
+                            if ((edgeFlags & 64) == 64) {
+                                positions.add(x + lerp(densities[densityIndex - xIncrement], densities[densityIndex]));
+                                positions.add(y);
+                                positions.add(z);
+                                cellInfo[densityIndex * 4 + 1] = index++;
+                            }
+                            // add a vertex on edge v2 to v6 if needed
+                            if ((edgeFlags & 1024) == 1024) {
+                                positions.add(x);
+                                positions.add(y + lerp(densities[densityIndex - yIncrement], densities[densityIndex]));
+                                positions.add(z);
+                                cellInfo[densityIndex * 4 + 2] = index++;
+                            }
 
-            positions.add(p0.x);
-            positions.add(p0.y);
-            positions.add(p0.z);
-            positions.add(p1.x);
-            positions.add(p1.y);
-            positions.add(p1.z);
-            positions.add(p2.x);
-            positions.add(p2.y);
-            positions.add(p2.z);
+                            break;
+                        }
+                        case 0b101: {
+                            // reuse flags from the cell under: v6 reused for v2
+                            final int underCornerFlags = cellInfo[(densityIndex - yIncrement) * 4 + 3];
+                            cornerFlags |= (underCornerFlags & 64) >> 4;
+                            // get the corresponding edge flags
+                            edgeFlags = EDGE_TABLE[cornerFlags];
+                            // add a vertex on edge v2 to v6 if needed
+                            if ((edgeFlags & 1024) == 1024) {
+                                positions.add(x);
+                                positions.add(y + lerp(densities[densityIndex - yIncrement], densities[densityIndex]));
+                                positions.add(z);
+                                cellInfo[densityIndex * 4 + 2] = index++;
+                            }
 
-            final Vector3f v0 = Vector3f.sub(p1, p0, null);
-            final Vector3f v1 = Vector3f.sub(p2, p0, null);
-            Vector3f.cross(v0, v1, v0).normalise(v0);
-            normals.add(v0.x);
-            normals.add(v0.y);
-            normals.add(v0.z);
-            normals.add(v0.x);
-            normals.add(v0.y);
-            normals.add(v0.z);
-            normals.add(v0.x);
-            normals.add(v0.y);
-            normals.add(v0.z);
+                            break;
+                        }
+                        case 0b110: {
+                            // reuse flags from the cell to the left: v6 reused for v7
+                            final int leftCornerFlags = cellInfo[(densityIndex - xIncrement) * 4 + 3];
+                            cornerFlags |= (leftCornerFlags & 64) << 1;
+                            // get the corresponding edge flags
+                            edgeFlags = EDGE_TABLE[cornerFlags];
+                            // add a vertex on edge v6 to v7 if needed
+                            if ((edgeFlags & 64) == 64) {
+                                positions.add(x + lerp(densities[densityIndex - xIncrement], densities[densityIndex]));
+                                positions.add(y);
+                                positions.add(z);
+                                cellInfo[densityIndex * 4 + 1] = index++;
+                            }
 
-            indices.add(index++);
-            indices.add(index++);
-            indices.add(index++);
+                            break;
+                        }
+                        case 0b111: {
+                            // the only point of data here is v6
+                            break;
+                        }
+                    }
+                    // store the data for later reuse
+                    cellInfo[densityIndex * 4 + 3] = cornerFlags;
+                    // since cells are between density values, there are none where any coordinate is zero
+                    if (zerosMask != 0) {
+                        continue;
+                    }
+                    // use the edge flags to look for vertices on edges, copying the indices to list for the working cell
+                    if ((edgeFlags & 1) == 1) {
+                        // add a vertex on the edge v0 to v1
+                        cellIndices[0] = cellInfo[(densityIndex - yIncrement - zIncrement) * 4 + 1];
+                    }
+                    if ((edgeFlags & 2) == 2) {
+                        // add a vertex on the edge v1 to v2
+                        cellIndices[1] = cellInfo[(densityIndex - yIncrement) * 4];
+                    }
+                    if ((edgeFlags & 4) == 4) {
+                        // add a vertex on the edge v2 to v3
+                        cellIndices[2] = cellInfo[(densityIndex - yIncrement) * 4 + 1];
+                    }
+                    if ((edgeFlags & 8) == 8) {
+                        // add a vertex on the edge v3 to v0
+                        cellIndices[3] = cellInfo[(densityIndex - xIncrement - yIncrement) * 4];
+                    }
+                    if ((edgeFlags & 16) == 16) {
+                        // add a vertex on the edge v4 to v5
+                        cellIndices[4] = cellInfo[(densityIndex - zIncrement) * 4 + 1];
+                    }
+                    if ((edgeFlags & 32) == 32) {
+                        // add a vertex on the edge v5 to v6
+                        cellIndices[5] = cellInfo[densityIndex * 4];
+                    }
+                    if ((edgeFlags & 64) == 64) {
+                        // add a vertex on the edge v6 to v7
+                        cellIndices[6] = cellInfo[densityIndex * 4 + 1];
+                    }
+                    if ((edgeFlags & 128) == 128) {
+                        // add a vertex on the edge v7 to v4
+                        cellIndices[7] = cellInfo[(densityIndex - xIncrement) * 4];
+                    }
+                    if ((edgeFlags & 256) == 256) {
+                        // add a vertex on the edge v0 to v4
+                        cellIndices[8] = cellInfo[(densityIndex - xIncrement - zIncrement) * 4 + 2];
+                    }
+                    if ((edgeFlags & 512) == 512) {
+                        // add a vertex on the edge v1 to v5
+                        cellIndices[9] = cellInfo[(densityIndex - zIncrement) * 4 + 2];
+                    }
+                    if ((edgeFlags & 1024) == 1024) {
+                        // add a vertex on the edge v2 to v6
+                        cellIndices[10] = cellInfo[densityIndex * 4 + 2];
+                    }
+                    if ((edgeFlags & 2048) == 2048) {
+                        // add a vertex on the edge v3 to v7
+                        cellIndices[11] = cellInfo[(densityIndex - xIncrement) * 4 + 2];
+                    }
+                    // get the indices to generate the triangle mesh
+                    final byte[] triangleIndices = TRIANGLE_TABLE[cornerFlags];
+                    // add the indices that compose each triangle
+                    for (int i = 0; triangleIndices[i] != -1; i += 3) {
+                        indices.add(cellIndices[triangleIndices[i]]);
+                        indices.add(cellIndices[triangleIndices[i + 1]]);
+                        indices.add(cellIndices[triangleIndices[i + 2]]);
+                    }
+                }
+            }
         }
-
-        return index;
+        // generate the vertex data object, requesting the generation of normals to complete the mesh
+        return MeshGenerator.buildMesh(new Vector4i(3, 3, 3, 0), positions, null, null, indices);
     }
 
-    private Vector3f lerp(Vector3f p1, Vector3f p2, double valp1, double valp2) {
-        if (Math.abs(threshold - valp1) < 0.00001) {
-            return p1;
-        }
-        if (Math.abs(threshold - valp2) < 0.00001) {
-            return p2;
-        }
-        if (Math.abs(valp1 - valp2) < 0.00001) {
-            return p1;
-        }
-        float mu = (float) ((threshold - valp1) / (valp2 - valp1));
-        return new Vector3f(p1.x + mu * (p2.x - p1.x), p1.y + mu * (p2.y - p1.y), p1.z + mu * (p2.z - p1.z));
+    // linearly interpolates between -1 and 0 using the values for value a (left) and value b (right) and the threshold
+    private float lerp(double va, double vb) {
+        return GenericMath.lerp(-1, 0, (float) ((threshold - va) / (vb - va)));
     }
 }
