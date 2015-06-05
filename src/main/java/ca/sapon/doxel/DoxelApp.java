@@ -45,6 +45,7 @@ public class DoxelApp {
     private static Vector3f modelSize = Vector3f.ONE;
     // Input
     private static boolean mouseGrabbed = true;
+    private static boolean lightTrack = true;
     private static float cameraPitch = 0;
     private static float cameraYaw = 0;
     private static long lastUpdateTime = -1;
@@ -105,8 +106,14 @@ public class DoxelApp {
         final boolean mouseGrabbedBefore = mouseGrabbed;
         while (Keyboard.next()) {
             if (Keyboard.getEventKeyState()) {
-                if (Keyboard.getEventKey() == Keyboard.KEY_ESCAPE) {
-                    mouseGrabbed ^= true;
+                final int key = Keyboard.getEventKey();
+                switch (key) {
+                    case Keyboard.KEY_ESCAPE:
+                        mouseGrabbed ^= true;
+                        break;
+                    case Keyboard.KEY_E:
+                        lightTrack ^= true;
+                        break;
                 }
             }
         }
@@ -154,7 +161,9 @@ public class DoxelApp {
             position = position.add(up.mul(-correctedCameraSpeed));
         }
         camera.setPosition(position);
-        Doxel.lightPosition(position);
+        if (lightTrack) {
+            Doxel.lightPosition(position);
+        }
     }
 
     /**
