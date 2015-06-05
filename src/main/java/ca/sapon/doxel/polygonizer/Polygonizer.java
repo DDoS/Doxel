@@ -9,7 +9,6 @@ import ca.sapon.doxel.NoiseSource;
  * Generates a triangle mesh from grid cells.
  *
  * @author DDoS
- * @see GridCell
  */
 public abstract class Polygonizer {
     protected double threshold = 0.5;
