@@ -17,9 +17,6 @@ void main() {
     float ambientTerm = ambientIntensity;
     vec3 nNormalView = normalize(normalView);
     vec3 nLightDirectionView = normalize(positionView - lightPositionView);
-    if (dot(nNormalView, nLightDirectionView) < 0) {
-        nNormalView = -nNormalView;
-    }
     float diffuseTerm = diffuseIntensity * max(0, dot(nNormalView, nLightDirectionView));
     float specularTerm;
     if (diffuseTerm > 0) {
