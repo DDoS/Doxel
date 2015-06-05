@@ -91,7 +91,7 @@ public class Doxel {
         // Pipeline
         pipeline = new PipelineBuilder().clearBuffer().renderModels(models).updateDisplay().build();
         // Camera
-        final Camera camera = Camera.createPerspective(fieldOfView, windowWidth, windowHeight, 0.1f, 100f);
+        final Camera camera = Camera.createPerspective(fieldOfView, windowWidth, windowHeight, 0.1f, 300f);
         context.setCamera(camera);
         created = true;
     }
